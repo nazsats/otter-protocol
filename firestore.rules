@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users: owner writes their own, any auth user reads (leaderboard/referral lookup)
+    match /users/{userId} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Referrals: auth users can read and create (create uses applyReferral logic)
+    match /referrals/{referralId} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    // Mission progress: owner reads/writes their own flags
+    match /user_missions/{userId} {
+      allow read:  if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // OTTER claims: ONLY server (Admin SDK) writes — client read-only for own claims
+    // Admin SDK bypasses these rules entirely; client cannot write
+    match /otter_claims/{claimId} {
+      allow read:             if request.auth != null
+                                && request.auth.uid == resource.data.uid;
+      allow create, update, delete: if false;  // server-only via Admin SDK
+    }
+
+    // Drop claims: same — server writes, user reads own
+    match /drop_claims/{claimId} {
+      allow read:             if request.auth != null
+                                && request.auth.uid == resource.data.uid;
+      allow create, update, delete: if false;
+    }
+
+    // Drops: public read (needed for drop list + hint display), server writes
+    match /drops/{dropId} {
+      allow read:                   if true;  // anyone can see active drops + hints
+      allow create, update, delete: if false; // admin only via Admin SDK
+    }
+
+    // Activity feed: public read, server writes only
+    match /activity/{entryId} {
+      allow read:                   if true;
+      allow create, update, delete: if false;
+    }
+
+    // Rate limiting counters: server writes only
+    match /rate_limits/{key} {
+      allow read, write: if false; // Admin SDK only
+    }
+
+    // Memes: public read (gallery), server writes only (Admin SDK)
+    match /memes/{memeId} {
+      allow read:                   if true;
+      allow create, update, delete: if false; // Admin SDK only
+    }
+
+    // Meme votes: auth users read own, server writes only
+    match /meme_votes/{voteId} {
+      allow read:                   if request.auth != null;
+      allow create, update, delete: if false; // Admin SDK only
+    }
+
+    // OTTER whitelist: server writes only, user reads own entry
+    match /otter_whitelist/{uid} {
+      allow read:                   if request.auth != null && request.auth.uid == uid;
+      allow create, update, delete: if false; // Admin SDK only
+    }
+
+    // Admin settings: server reads and writes only
+    match /admin_settings/{docId} {
+      allow read, write: if false; // Admin SDK only
+    }
+
+    // Admin log: server writes only
+    match /admin_log/{entryId} {
+      allow read, write: if false; // Admin SDK only
+    }
+  }
+}
