@@ -318,3 +318,119 @@ body {
 @media (max-width: 480px) {
   body { font-size: 14px; line-height: 1.7; }
 }
+
+/* ─── MICRO-INTERACTIONS ──────────────────────────────────────────────── */
+@keyframes wallet-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(0,200,150,0.4); }
+  50%      { box-shadow: 0 0 0 8px rgba(0,200,150,0); }
+}
+@keyframes btn-press-anim {
+  0%,100% { transform: scale(1); }
+  50%      { transform: scale(0.97); }
+}
+@keyframes card-appear {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes gold-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+/* Pressable — add to any button/link */
+.btn-press:active { transform: scale(0.97) !important; opacity: 0.9 !important; }
+.btn-press { transition: transform 0.1s, opacity 0.1s !important; }
+
+/* Card hover lift */
+.card-lift { transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important; }
+.card-lift:hover { transform: translateY(-2px) !important; box-shadow: 0 12px 40px rgba(0,0,0,0.6) !important; }
+
+/* Gold shimmer sweep on hover (overlay) */
+.btn-shimmer { position: relative; overflow: hidden; }
+.btn-shimmer::after {
+  content: "";
+  position: absolute; top: 0; left: 0; width: 40%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  transform: translateX(-100%);
+  transition: none;
+}
+.btn-shimmer:hover::after { animation: gold-sweep 0.5s ease forwards; }
+
+/* Wallet connection pulse */
+.wallet-dot-pulse { animation: wallet-pulse 2.5s ease-in-out infinite; }
+
+/* Input focus ring override */
+input:focus, textarea:focus, select:focus {
+  box-shadow: 0 0 0 2px rgba(201,168,76,0.12) !important;
+}
+
+/* Touch tap highlight removed */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* ─── DAPP LAYOUT — RESPONSIVE ─────────────────────────────────────────── */
+.dapp-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 24px;
+  align-items: start;
+}
+
+.dapp-tabs {
+  display: flex;
+  gap: 3px;
+  background: #0D0B07;
+  border: 1px solid #1E1A10;
+  border-radius: 8px;
+  padding: 4px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.dapp-tabs::-webkit-scrollbar { display: none; }
+
+.dapp-stat-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+
+/* ─── LANDING PAGE — RESPONSIVE ──────────────────────────────────────────── */
+.hero-h1 {
+  font-family: var(--font-cinzel, Georgia, serif);
+  font-weight: 900;
+  line-height: 1.0;
+  letter-spacing: -0.02em;
+  margin-bottom: 28px;
+}
+
+/* ─── BREAKPOINTS ──────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .dapp-layout { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 768px) {
+  .roadmap-item {
+    grid-template-columns: 80px 1fr !important;
+    gap: 16px !important;
+    margin-left: 36px !important;
+    padding-left: 18px !important;
+  }
+  .problem-grid    { grid-template-columns: 1fr !important; }
+  .tokenomics-grid { grid-template-columns: 1fr !important; }
+  .referral-grid   { grid-template-columns: 1fr !important; }
+  .community-socials { flex-direction: column !important; align-items: stretch !important; }
+  .community-socials a { min-width: unset !important; text-align: center !important; }
+  .hero-stats { gap: 20px !important; padding-top: 28px !important; }
+}
+
+@media (max-width: 640px) {
+  .hero-h1 { font-size: clamp(26px, 9vw, 44px) !important; letter-spacing: -0.01em !important; }
+  .hero-cta { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
+  .hero-cta > * { width: 100% !important; box-sizing: border-box !important; justify-content: center !important; }
+  .hero-coin-wrap { gap: 10px !important; }
+  .artifact-hide-mobile { display: none !important; }
+  .dapp-stat-3 { grid-template-columns: 1fr !important; }
+  .leaderboard-header { grid-template-columns: 32px 1fr 70px !important; }
+  .leaderboard-row    { grid-template-columns: 32px 1fr 70px !important; }
+}
+
+@media (max-width: 420px) {
+  .hero-h1 { font-size: 26px !important; }
+}

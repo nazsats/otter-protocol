@@ -193,7 +193,20 @@ export default function DAppPage() {
   return (
     <div style={{ minHeight: "100vh", background: C.black, color: C.text }}>
       <Navbar />
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
+      <style>{`
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+        @keyframes tab-slide{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+        .dapp-tab-active { background: rgba(201,168,76,0.1) !important; color: #C9A84C !important; border-bottom: 1px solid rgba(201,168,76,0.35) !important; }
+        .dapp-tab-btn:hover:not(.dapp-tab-active) { background: rgba(201,168,76,0.04) !important; color: #8C7A5C !important; }
+        .dapp-tab-btn { flex-shrink: 0; transition: all 0.15s; white-space: nowrap; }
+        @media(max-width:640px){
+          .dapp-sidebar-top { order: -1; }
+          .dapp-tab-btn { min-width: 68px; font-size: 9px !important; padding: 7px 4px !important; gap: 3px !important; }
+          .dapp-tab-btn span { display: none; }
+          .dapp-tab-icon { display: flex !important; }
+        }
+      `}</style>
 
       <main style={{ maxWidth: "1100px", margin: "0 auto", padding: "32px 20px 80px" }}>
 
@@ -219,28 +232,24 @@ export default function DAppPage() {
           </p>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: "24px", alignItems: "start" }}>
+        <div className="dapp-layout">
 
           {/* ── LEFT COLUMN ── */}
           <div>
             {/* Tab nav */}
-            <div style={{
-              display: "flex", gap: "3px",
-              background: C.card, border: `1px solid ${C.border}`,
-              borderRadius: "8px", padding: "4px", marginBottom: "20px",
-            }}>
+            <div className="dapp-tabs">
               {tabs.map((t) => (
-                <button key={t.id} onClick={() => setTab(t.id)} style={{
-                  flex: 1, padding: "8px 6px", borderRadius: "6px", border: "none",
-                  background: tab === t.id ? "rgba(201,168,76,0.1)" : "transparent",
-                  color: tab === t.id ? C.gold : C.mutedH,
-                  fontSize: "11px", fontWeight: 700, cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
-                  transition: "all 0.15s",
-                  fontFamily: "var(--font-cinzel, serif)",
-                  letterSpacing: "0.04em",
-                  borderBottom: tab === t.id ? `1px solid rgba(201,168,76,0.3)` : "1px solid transparent",
-                }}>
+                <button key={t.id} onClick={() => setTab(t.id)}
+                  className={`dapp-tab-btn${tab === t.id ? " dapp-tab-active" : ""}`}
+                  style={{
+                    flex: 1, padding: "8px 6px", borderRadius: "6px", border: "none",
+                    background: tab === t.id ? "rgba(201,168,76,0.1)" : "transparent",
+                    color: tab === t.id ? C.gold : C.mutedH,
+                    fontSize: "11px", fontWeight: 700, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
+                    fontFamily: "var(--font-cinzel, serif)", letterSpacing: "0.04em",
+                    borderBottom: tab === t.id ? `1px solid rgba(201,168,76,0.3)` : "1px solid transparent",
+                  }}>
                   {t.icon}{t.label}
                 </button>
               ))}
@@ -306,7 +315,7 @@ export default function DAppPage() {
                 </div>
 
                 {/* Protocol stats strip */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px" }}>
+                <div className="dapp-stat-3">
                   {[
                     { label: "Total Supply", value: supply ?? "—",                         sub: "OTTER minted", glyph: "א" },
                     { label: "Contract",     value: CONTRACT_ADDRESS ? "Verified" : "—",   sub: "Sepolia Testnet", glyph: "ב" },

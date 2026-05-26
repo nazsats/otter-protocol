@@ -23,9 +23,11 @@ export const appKit = createAppKit({
   },
   themeMode: "dark",
   themeVariables: {
-    "--w3m-accent":           "#C9A84C",
-    "--w3m-border-radius-master": "8px",
-    "--w3m-font-family":      "inherit",
+    "--w3m-accent":                "#C9A84C",
+    "--w3m-border-radius-master":  "4px",
+    "--w3m-font-family":           "inherit",
+    "--w3m-color-mix":             "#000000",
+    "--w3m-color-mix-strength":    15,
   },
 });
 
