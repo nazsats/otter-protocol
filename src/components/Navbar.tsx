@@ -83,11 +83,11 @@ export default function Navbar() {
             {/* ── Logo ── */}
             <Link href="/about" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
               <div style={{
-                width: "32px", height: "32px", borderRadius: "8px", flexShrink: 0,
-                background: "linear-gradient(135deg, #C9A84C, #E2BF6E)",
-                display: "flex", alignItems: "center", justifyContent: "center",
+                width: "36px", height: "36px", borderRadius: "50%", flexShrink: 0,
+                boxShadow: "0 0 0 1.5px rgba(201,168,76,0.5), 0 0 16px rgba(201,168,76,0.15)",
+                overflow: "hidden",
               }}>
-                <span style={{ fontWeight: 900, fontSize: "11px", color: "#000", fontFamily: "var(--font-cinzel, serif)", letterSpacing: "0.05em" }}>OT</span>
+                <img src="/otter-logo.png" alt="OTTER" width={36} height={36} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
               </div>
               <span style={{
                 fontFamily: "var(--font-cinzel, serif)",

@@ -144,14 +144,14 @@ function CoinLogo({ size = 100 }: { size?: number }) {
   return (
     <div className="coin-glow-anim" style={{
       width: size, height: size, borderRadius: "50%",
-      background: `radial-gradient(circle at 36% 32%, #F4DC8A 0%, #D4A835 32%, #8B6000 64%, #4A3200 100%)`,
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      position: "relative", flexShrink: 0,
+      overflow: "hidden", flexShrink: 0, position: "relative",
+      boxShadow: "0 0 0 2px rgba(201,168,76,0.5), 0 0 0 6px rgba(201,168,76,0.08), 0 0 60px rgba(201,168,76,0.25)",
     }}>
-      <div style={{ position: "absolute", inset: Math.round(size * 0.06), borderRadius: "50%", border: "1px solid rgba(255,228,130,0.25)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", inset: Math.round(size * 0.13), borderRadius: "50%", border: "1px solid rgba(255,228,130,0.12)", pointerEvents: "none" }} />
-      <span style={{ fontFamily: FONT, fontSize: Math.round(size * 0.15), fontWeight: 900, color: "rgba(255,246,200,0.96)", letterSpacing: "0.12em", textShadow: "0 1px 3px rgba(0,0,0,0.9)", lineHeight: 1, userSelect: "none" }}>OTTER</span>
-      <span style={{ fontFamily: MONO, fontSize: Math.round(size * 0.09), color: "rgba(255,228,130,0.55)", marginTop: Math.round(size * 0.04), letterSpacing: "0.18em", userSelect: "none" }}>◈ I ◈</span>
+      <img
+        src="/otter-logo.png"
+        alt="OTTER Protocol"
+        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+      />
     </div>
   );
 }

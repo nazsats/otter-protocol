@@ -346,22 +346,16 @@ export default function GatePage() {
               transition:"border-color 0.5s",
             }} />
             <div style={{
-              width:"72px", height:"72px", borderRadius:"16px",
-              background: status==="success"
-                ? "linear-gradient(135deg,#00C896,#00FF88)"
-                : "linear-gradient(135deg,#C9A84C,#E2BF6E)",
-              display:"flex", alignItems:"center", justifyContent:"center",
+              width:"88px", height:"88px", borderRadius:"50%",
+              overflow:"hidden",
               boxShadow: status==="success"
-                ? "0 0 50px rgba(0,200,150,0.35)"
-                : "0 0 40px rgba(201,168,76,0.18)",
+                ? "0 0 0 2px rgba(0,200,150,0.7), 0 0 50px rgba(0,200,150,0.35)"
+                : "0 0 0 2px rgba(201,168,76,0.55), 0 0 40px rgba(201,168,76,0.22)",
               transition:"all 0.5s",
-              animation: status==="success" ? "successPulse 1.8s ease-in-out infinite" : undefined,
+              animation: status==="success" ? "successPulse 1.8s ease-in-out infinite" : "coin-glow-anim 4s ease-in-out infinite",
+              filter: status==="success" ? "hue-rotate(120deg) brightness(1.05)" : "none",
             }}>
-              <span style={{
-                fontWeight:900, fontSize:"22px",
-                color:"#000", fontFamily:"Georgia,serif",
-                letterSpacing:"-1px",
-              }}>OT</span>
+              <img src="/otter-logo.png" alt="OTTER" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
             </div>
           </div>
 

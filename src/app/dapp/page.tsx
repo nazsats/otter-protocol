@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import WalletConnect from "@/components/web3/WalletConnect";
 import MissionBoard from "@/components/MissionBoard";
+import InitiationTerminal from "@/components/InitiationTerminal";
 import ActivityFeed from "@/components/ActivityFeed";
 import DropHunt from "@/components/DropHunt";
 import MemeArena from "@/components/MemeArena";
@@ -42,7 +43,7 @@ const TIER_BG      = ["rgba(92,92,92,0.08)", "rgba(167,139,250,0.08)", "rgba(201
 const TIER_DAYS    = [0, 30, 90];
 const TIER_REWARDS = ["1.0×", "1.5×", "2.0×"];
 
-type Tab = "dashboard" | "missions" | "onchain" | "leaderboard" | "drops" | "memes";
+type Tab = "dashboard" | "initiation" | "missions" | "onchain" | "leaderboard" | "drops" | "memes";
 
 export default function DAppPage() {
   const { user, profile, openAuthModal } = useAuth();
@@ -183,7 +184,8 @@ export default function DAppPage() {
   // ── NAV TABS ─────────────────────────────────────────────────────────────
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "dashboard",   label: "Dashboard",   icon: <Activity size={14} /> },
-    { id: "missions",    label: "Missions",    icon: <Zap size={14} /> },
+    { id: "initiation",  label: "◈ Initiation", icon: <Zap size={14} /> },
+    { id: "missions",    label: "Missions",    icon: <BarChart2 size={14} /> },
     { id: "memes",       label: "Meme Arena",  icon: <span style={{ fontSize: "13px" }}>🔥</span> },
     { id: "drops",       label: "Drop Hunts",  icon: <span style={{ fontSize: "13px" }}>🎯</span> },
     { id: "onchain",     label: "On-Chain",    icon: <Shield size={14} /> },
@@ -485,6 +487,34 @@ export default function DAppPage() {
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ════ INITIATION TERMINAL ════ */}
+            {tab === "initiation" && (
+              <div style={{ animation: "tab-slide 0.3s ease both" }}>
+                {user
+                  ? <InitiationTerminal />
+                  : (
+                    <div style={{
+                      background: "#0D0B07", border: "1px solid #1E1A10",
+                      borderRadius: "8px", padding: "48px 24px", textAlign: "center",
+                    }}>
+                      <div style={{ fontFamily: "var(--font-geist-mono)", color: "#C9A84C", fontSize: "12px", marginBottom: "16px", letterSpacing: "0.2em" }}>
+                        ◈ INITIATION TERMINAL — ACCESS RESTRICTED
+                      </div>
+                      <p style={{ fontFamily: "var(--font-cinzel,serif)", color: "#8C7A5C", fontSize: "13px", marginBottom: "20px" }}>
+                        Sign in to begin your protocol initiation sequence.
+                      </p>
+                      <button onClick={openAuthModal} style={{
+                        fontFamily: "var(--font-cinzel,serif)", fontWeight: 700, fontSize: "12px",
+                        color: "#000", background: "linear-gradient(135deg,#C9A84C,#E2BF6E)",
+                        border: "none", padding: "12px 28px", borderRadius: "6px",
+                        cursor: "pointer", letterSpacing: "0.1em",
+                      }}>INITIATE PROTOCOL ACCESS</button>
+                    </div>
+                  )
+                }
               </div>
             )}
 

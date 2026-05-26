@@ -3,6 +3,12 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { MISSIONS } from "@/lib/missions";
 import {
+  INITIATION_TASKS, CATEGORY_META, DIFFICULTY_META,
+  getPendingApprovals, approveManualTask, rejectManualTask,
+  saveTaskOverride, getTaskOverrides, applyTaskOverrides,
+  type PendingApproval, type InitiationTask, type TaskCategory, type TaskOverride,
+} from "@/lib/initiation";
+import {
   Users, Settings, Star, Activity, Shield, ChevronDown,
   Search, Plus, Trash2, Check, X, RefreshCw, BarChart3,
 } from "lucide-react";
@@ -21,6 +27,8 @@ const C = {
   green:  "#00C896",
   red:    "#FF4545",
   purple: "#A78BFA",
+  amber:  "#F5A623",
+  blue:   "#60A5FA",
 };
 
 const ADMIN_EMAIL  = "nazsats@gmail.com";
@@ -78,7 +86,7 @@ interface SeasonSettings {
   dropHuntEnabled:       boolean;
 }
 
-type Tab = "overview" | "users" | "whitelist" | "season" | "missions";
+type Tab = "overview" | "users" | "whitelist" | "season" | "missions" | "initiation" | "approvals";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function shortAddr(addr: string) {
@@ -203,11 +211,13 @@ export default function AdminPage() {
   if (!isAdmin) return <AccessDenied reason="Your account is not authorized for admin access." />;
 
   const TABS: { id: Tab; label: string; glyph: string; icon: React.ReactNode }[] = [
-    { id: "overview",  label: "OVERVIEW",  glyph: "א", icon: <BarChart3 size={12} /> },
-    { id: "users",     label: "USERS",     glyph: "ב", icon: <Users size={12} /> },
-    { id: "whitelist", label: "WHITELIST", glyph: "ג", icon: <Star size={12} /> },
-    { id: "season",    label: "SEASON",    glyph: "ד", icon: <Settings size={12} /> },
-    { id: "missions",  label: "MISSIONS",  glyph: "ה", icon: <Shield size={12} /> },
+    { id: "overview",   label: "OVERVIEW",    glyph: "א", icon: <BarChart3 size={12} /> },
+    { id: "users",      label: "USERS",       glyph: "ב", icon: <Users size={12} /> },
+    { id: "initiation", label: "◈ INITIATION",glyph: "ג", icon: <Activity size={12} /> },
+    { id: "approvals",  label: "APPROVALS",   glyph: "ד", icon: <Check size={12} /> },
+    { id: "whitelist",  label: "WHITELIST",   glyph: "ה", icon: <Star size={12} /> },
+    { id: "season",     label: "SEASON",      glyph: "ו", icon: <Settings size={12} /> },
+    { id: "missions",   label: "MISSIONS",    glyph: "ז", icon: <Shield size={12} /> },
   ];
 
   return (
@@ -258,11 +268,13 @@ export default function AdminPage() {
 
         {/* ── Content ── */}
         <div style={{ maxWidth: "1440px", margin: "0 auto", padding: "32px" }}>
-          {tab === "overview"  && <OverviewTab  token={token} toast={toast.show} />}
-          {tab === "users"     && <UsersTab     token={token} toast={toast.show} />}
-          {tab === "whitelist" && <WhitelistTab token={token} toast={toast.show} />}
-          {tab === "season"    && <SeasonTab    token={token} toast={toast.show} />}
-          {tab === "missions"  && <MissionsTab  token={token} toast={toast.show} />}
+          {tab === "overview"   && <OverviewTab      token={token} toast={toast.show} />}
+          {tab === "users"      && <UsersTab         token={token} toast={toast.show} />}
+          {tab === "initiation" && <InitiationAdminTab toast={toast.show} />}
+          {tab === "approvals"  && <ApprovalsTab     toast={toast.show} />}
+          {tab === "whitelist"  && <WhitelistTab     token={token} toast={toast.show} />}
+          {tab === "season"     && <SeasonTab        token={token} toast={toast.show} />}
+          {tab === "missions"   && <MissionsTab      token={token} toast={toast.show} />}
         </div>
       </div>
     </>
@@ -790,6 +802,427 @@ function SeasonTab({ token, toast }: { token: string; toast: (m: string, ok?: bo
 // ═══════════════════════════════════════════════════════════════════════════
 // Missions Tab
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// Initiation Admin Tab — Task CRUD + on-chain info
+// ═══════════════════════════════════════════════════════════════════════════
+function InitiationAdminTab({ toast }: { toast: (m: string, ok?: boolean) => void }) {
+  const [filterCat,  setFilterCat]  = useState<TaskCategory | "ALL">("ALL");
+  const [editTask,   setEditTask]   = useState<InitiationTask | null>(null);
+  const [editTitle,  setEditTitle]  = useState("");
+  const [editSignal, setEditSignal] = useState("");
+  const [editLink,   setEditLink]   = useState("");
+  const [editDesc,   setEditDesc]   = useState("");
+  const [editActive, setEditActive] = useState(true);
+  const [saving,     setSaving]     = useState(false);
+  const [overrides,  setOverrides]  = useState<Record<string, TaskOverride>>({});
+
+  useEffect(() => {
+    getTaskOverrides().then(setOverrides).catch(() => {});
+  }, []);
+
+  const tasks = applyTaskOverrides(INITIATION_TASKS, overrides);
+
+  const openEdit = (task: InitiationTask) => {
+    const ov = overrides[task.id];
+    setEditTask(task);
+    setEditTitle(ov?.title  ?? task.title);
+    setEditSignal(String(ov?.signal ?? task.signal));
+    setEditLink(ov?.link  ?? task.link  ?? "");
+    setEditDesc(ov?.desc  ?? task.desc);
+    setEditActive(ov?.active ?? true);
+  };
+
+  const saveEdit = async () => {
+    if (!editTask) return;
+    setSaving(true);
+    try {
+      await saveTaskOverride(editTask.id, {
+        title:  editTitle,
+        signal: Number(editSignal),
+        link:   editLink || undefined,
+        desc:   editDesc,
+        active: editActive,
+      });
+      const updated = await getTaskOverrides();
+      setOverrides(updated);
+      toast(`Task "${editTitle}" updated`, true);
+      setEditTask(null);
+    } catch {
+      toast("Update failed", false);
+    }
+    setSaving(false);
+  };
+
+  const cats: (TaskCategory | "ALL")[] = ["ALL", "SIGNAL_ACQUISITION", "KNOWLEDGE_ARCHIVE", "CONTRIBUTION", "CIPHER_HUNT", "SIGNAL_RELAY", "GOVERNANCE"];
+  const visible = filterCat === "ALL"
+    ? tasks
+    : tasks.filter((t) => t.category === filterCat);
+
+  const catDone  = (cat: TaskCategory) => tasks.filter((t) => t.category === cat).length;
+  const totalSignal = tasks.reduce((s, t) => s + t.signal, 0);
+
+  return (
+    <div>
+      <SectionHeader glyph="ג" title="INITIATION TERMINAL — TASK REGISTRY"
+        action={
+          <div style={{ fontFamily: "var(--font-geist-mono)", fontSize: "9px", color: C.muted, letterSpacing: "0.12em" }}>
+            {tasks.length} TASKS · {totalSignal.toLocaleString()} MAX SIGNAL
+          </div>
+        }
+      />
+
+      {/* Overview stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: "10px", marginBottom: "24px" }}>
+        {Object.entries(CATEGORY_META).map(([cat, meta]) => (
+          <div key={cat} style={{
+            background: C.card, border: `1px solid ${C.border}`,
+            borderRadius: "8px", padding: "14px 16px",
+          }}>
+            <div style={{ fontFamily: "var(--font-geist-mono)", color: meta.color, fontSize: "18px", marginBottom: "6px" }}>{meta.glyph}</div>
+            <div style={{ fontFamily: FONT, color: C.text, fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", marginBottom: "2px" }}>
+              {meta.label.slice(0, 14)}
+            </div>
+            <div style={{ fontFamily: "var(--font-geist-mono)", color: C.muted, fontSize: "9px" }}>
+              {catDone(cat as TaskCategory)} TASKS
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Edit modal */}
+      {editTask && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)",
+          zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px",
+        }}>
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "28px", width: "100%", maxWidth: "520px" }}>
+            <div style={{ fontFamily: FONT, fontSize: "9px", color: C.muted, letterSpacing: "0.2em", marginBottom: "16px" }}>
+              ◈ EDIT TASK — {editTask.id.toUpperCase()}
+            </div>
+            <div style={{ marginBottom: "14px" }}>
+              <Label>TASK TITLE</Label>
+              <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
+                style={{ ...inputStyle }} />
+            </div>
+            <div style={{ marginBottom: "14px" }}>
+              <Label>DESCRIPTION</Label>
+              <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)}
+                rows={3}
+                style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
+            </div>
+            <div style={{ marginBottom: "14px" }}>
+              <Label>REDIRECT LINK / SOCIAL URL</Label>
+              <input value={editLink} onChange={(e) => setEditLink(e.target.value)}
+                placeholder="https://… or /internal-path"
+                style={{ ...inputStyle }} />
+            </div>
+            <div style={{ marginBottom: "14px" }}>
+              <Label>SIGNAL REWARD</Label>
+              <input value={editSignal} onChange={(e) => setEditSignal(e.target.value)}
+                type="number" style={{ ...inputStyle }} />
+            </div>
+            <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", gap: "10px" }}>
+              <Label>ACTIVE</Label>
+              <button onClick={() => setEditActive((v) => !v)}
+                style={{
+                  fontFamily: FONT, fontSize: "10px", fontWeight: 700, padding: "6px 14px",
+                  borderRadius: "6px", border: "none", cursor: "pointer",
+                  background: editActive ? C.green : C.red, color: "#000", letterSpacing: "0.1em",
+                }}>
+                {editActive ? "ACTIVE" : "INACTIVE"}
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <AdminBtn onClick={saveEdit} variant="gold" disabled={saving}>
+                {saving ? "SAVING…" : "SAVE CHANGES"}
+              </AdminBtn>
+              <AdminBtn onClick={() => setEditTask(null)} variant="outline">CANCEL</AdminBtn>
+            </div>
+            <div style={{ marginTop: "14px", fontFamily: "var(--font-geist-mono)", fontSize: "9px", color: C.muted, lineHeight: 1.7 }}>
+              Note: Title/reward changes require an on-chain tx via guardian wallet<br/>
+              (contract.updateTask()) once OTTERInitiation.sol is deployed to Sepolia.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category filter */}
+      <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "16px" }}>
+        {cats.map((cat) => {
+          const meta = cat === "ALL" ? null : CATEGORY_META[cat as TaskCategory];
+          const color = meta?.color ?? C.gold;
+          const isActive = filterCat === cat;
+          return (
+            <button key={cat} onClick={() => setFilterCat(cat as TaskCategory | "ALL")}
+              style={{
+                fontFamily: "var(--font-geist-mono)", fontSize: "8px", fontWeight: 700,
+                padding: "5px 10px", borderRadius: "4px", border: "none",
+                cursor: "pointer", letterSpacing: "0.1em",
+                background: isActive ? color + "18" : "transparent",
+                color: isActive ? color : C.mutedL,
+                borderBottom: isActive ? `2px solid ${color}` : "2px solid transparent",
+              }}>
+              {cat === "ALL" ? "ALL TASKS" : (meta?.glyph + " " + cat.replace(/_/g, " "))}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Task list */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+        {visible.map((task) => {
+          const diff = DIFFICULTY_META[task.difficulty];
+          const catMeta = CATEGORY_META[task.category];
+          return (
+            <div key={task.id} style={{
+              background: C.card, border: `1px solid ${C.border}`,
+              borderRadius: "8px", padding: "14px 18px",
+              display: "flex", alignItems: "center", gap: "14px",
+            }}>
+              {/* Category glyph */}
+              <span style={{ fontFamily: "var(--font-geist-mono)", color: catMeta.color, fontSize: "16px", flexShrink: 0, width: "24px", textAlign: "center" }}>
+                {catMeta.glyph}
+              </span>
+
+              {/* Info */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
+                  <span style={{ fontFamily: FONT, color: C.text, fontSize: "12px", fontWeight: 700, letterSpacing: "0.04em" }}>
+                    {task.badge} {task.title}
+                  </span>
+                  <span style={{
+                    fontFamily: "var(--font-geist-mono)", fontSize: "8px", color: diff.color,
+                    background: diff.color + "12", border: `1px solid ${diff.color}25`,
+                    padding: "1px 6px", borderRadius: "2px", letterSpacing: "0.1em",
+                  }}>{diff.label}</span>
+                  {task.requiresApproval && (
+                    <span style={{
+                      fontFamily: "var(--font-geist-mono)", fontSize: "8px", color: C.amber,
+                      background: "rgba(245,166,35,0.08)", border: "1px solid rgba(245,166,35,0.2)",
+                      padding: "1px 6px", borderRadius: "2px",
+                    }}>MANUAL</span>
+                  )}
+                  {task.hidden && (
+                    <span style={{
+                      fontFamily: "var(--font-geist-mono)", fontSize: "8px", color: C.purple,
+                      background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.2)",
+                      padding: "1px 6px", borderRadius: "2px",
+                    }}>HIDDEN</span>
+                  )}
+                  {task.repeatable && (
+                    <span style={{
+                      fontFamily: "var(--font-geist-mono)", fontSize: "8px", color: C.blue,
+                      background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.2)",
+                      padding: "1px 6px", borderRadius: "2px",
+                    }}>REPEATABLE</span>
+                  )}
+                </div>
+                <div style={{ fontFamily: "var(--font-geist-mono)", color: C.mutedL, fontSize: "9px", letterSpacing: "0.06em" }}>
+                  {task.id} · contract: {task.contractId.slice(0, 12)}…
+                </div>
+              </div>
+
+              {/* Signal */}
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontFamily: "var(--font-geist-mono)", color: C.gold, fontWeight: 700, fontSize: "13px" }}>
+                  +{task.signal.toLocaleString()}
+                </div>
+                <div style={{ fontFamily: "var(--font-geist-mono)", color: C.mutedL, fontSize: "8px" }}>SIGNAL</div>
+              </div>
+
+              {/* Edit button */}
+              <AdminBtn onClick={() => openEdit(task)} variant="outline" small>EDIT</AdminBtn>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Approvals Tab — Manual task submission review queue
+// ═══════════════════════════════════════════════════════════════════════════
+function ApprovalsTab({ toast }: { toast: (m: string, ok?: boolean) => void }) {
+  const [approvals, setApprovals] = useState<PendingApproval[]>([]);
+  const [loading,   setLoading]   = useState(true);
+  const [busy,      setBusy]      = useState<string | null>(null);
+  const [filter,    setFilter]    = useState<"pending" | "approved" | "rejected" | "all">("pending");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getPendingApprovals();
+      setApprovals(data);
+    } catch {
+      toast("Failed to load approvals", false);
+    }
+    setLoading(false);
+  }, [toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleApprove = async (a: PendingApproval) => {
+    setBusy(a.id);
+    try {
+      await approveManualTask(a.id, a.uid, a.taskId);
+      toast(`Approved: ${a.taskId}`, true);
+      await load();
+    } catch {
+      toast("Approval failed", false);
+    }
+    setBusy(null);
+  };
+
+  const handleReject = async (a: PendingApproval) => {
+    setBusy(a.id + "_r");
+    try {
+      await rejectManualTask(a.id);
+      toast(`Rejected: ${a.taskId}`, true);
+      await load();
+    } catch {
+      toast("Rejection failed", false);
+    }
+    setBusy(null);
+  };
+
+  const visible = filter === "all" ? approvals : approvals.filter((a) => a.status === filter);
+  const pendingCount = approvals.filter((a) => a.status === "pending").length;
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div>
+      <SectionHeader glyph="ד" title="APPROVAL QUEUE — GUARDIAN REVIEW"
+        action={
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {pendingCount > 0 && (
+              <span style={{
+                fontFamily: "var(--font-geist-mono)", fontSize: "9px", color: C.amber,
+                background: "rgba(245,166,35,0.1)", border: "1px solid rgba(245,166,35,0.3)",
+                padding: "3px 10px", borderRadius: "3px", letterSpacing: "0.1em",
+              }}>
+                {pendingCount} PENDING
+              </span>
+            )}
+            <AdminBtn onClick={load} variant="ghost" small><RefreshCw size={12} /></AdminBtn>
+          </div>
+        }
+      />
+
+      {/* Filter tabs */}
+      <div style={{ display: "flex", gap: "4px", marginBottom: "16px" }}>
+        {(["pending", "approved", "rejected", "all"] as const).map((f) => {
+          const colors = { pending: C.amber, approved: C.green, rejected: C.red, all: C.gold };
+          return (
+            <button key={f} onClick={() => setFilter(f)}
+              style={{
+                fontFamily: "var(--font-geist-mono)", fontSize: "9px", fontWeight: 700,
+                padding: "6px 14px", borderRadius: "4px", border: "none",
+                cursor: "pointer", letterSpacing: "0.1em",
+                background: filter === f ? colors[f] + "15" : "transparent",
+                color: filter === f ? colors[f] : C.mutedL,
+                borderBottom: filter === f ? `2px solid ${colors[f]}` : "2px solid transparent",
+              }}>
+              {f.toUpperCase()} {f === "pending" ? `(${pendingCount})` : ""}
+            </button>
+          );
+        })}
+      </div>
+
+      {visible.length === 0 && (
+        <div style={{
+          background: C.card, border: `1px solid ${C.border}`,
+          borderRadius: "8px", padding: "40px", textAlign: "center",
+        }}>
+          <div style={{ fontFamily: "var(--font-geist-mono)", color: C.muted, fontSize: "10px", letterSpacing: "0.16em" }}>
+            {filter === "pending" ? "> NO PENDING SUBMISSIONS" : `> NO ${filter.toUpperCase()} ITEMS`}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        {visible.map((a) => {
+          const task = INITIATION_TASKS.find((t) => t.id === a.taskId);
+          const statusColor = { pending: C.amber, approved: C.green, rejected: C.red }[a.status];
+          const date = a.submittedAt?.seconds
+            ? new Date(a.submittedAt.seconds * 1000).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" })
+            : "—";
+
+          return (
+            <div key={a.id} style={{
+              background: C.card, border: `1px solid ${C.border}`,
+              borderLeft: `3px solid ${statusColor}`,
+              borderRadius: "8px", padding: "16px 20px",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", marginBottom: "10px", flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <span style={{ fontFamily: FONT, color: C.text, fontSize: "12px", fontWeight: 700, letterSpacing: "0.06em" }}>
+                      {task?.badge} {task?.title ?? a.taskId}
+                    </span>
+                    <span style={{
+                      fontFamily: "var(--font-geist-mono)", fontSize: "8px", color: statusColor,
+                      background: statusColor + "10", border: `1px solid ${statusColor}30`,
+                      padding: "1px 8px", borderRadius: "3px", letterSpacing: "0.1em",
+                    }}>{a.status.toUpperCase()}</span>
+                    {task && (
+                      <span style={{
+                        fontFamily: "var(--font-geist-mono)", fontSize: "8px", color: C.gold,
+                      }}>+{task.signal} SIGNAL</span>
+                    )}
+                  </div>
+                  <div style={{ fontFamily: "var(--font-geist-mono)", color: C.mutedL, fontSize: "9px" }}>
+                    UID: {a.uid.slice(0, 12)}… · {date}
+                  </div>
+                </div>
+
+                {a.status === "pending" && (
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <AdminBtn
+                      onClick={() => handleApprove(a)}
+                      variant="gold"
+                      disabled={busy === a.id}
+                      small
+                    >
+                      {busy === a.id ? "…" : "APPROVE"}
+                    </AdminBtn>
+                    <AdminBtn
+                      onClick={() => handleReject(a)}
+                      variant="danger"
+                      disabled={busy === a.id + "_r"}
+                      small
+                    >
+                      {busy === a.id + "_r" ? "…" : "REJECT"}
+                    </AdminBtn>
+                  </div>
+                )}
+              </div>
+
+              {/* Proof */}
+              {a.proofUrl && (
+                <div style={{ marginBottom: "8px" }}>
+                  <div style={{ fontFamily: "var(--font-geist-mono)", color: C.mutedL, fontSize: "8px", letterSpacing: "0.12em", marginBottom: "4px" }}>PROOF URL</div>
+                  <a href={a.proofUrl} target="_blank" rel="noopener noreferrer"
+                    style={{ fontFamily: "var(--font-geist-mono)", color: C.blue, fontSize: "10px", wordBreak: "break-all" }}>
+                    {a.proofUrl}
+                  </a>
+                </div>
+              )}
+              {a.note && (
+                <div>
+                  <div style={{ fontFamily: "var(--font-geist-mono)", color: C.mutedL, fontSize: "8px", letterSpacing: "0.12em", marginBottom: "4px" }}>NOTE</div>
+                  <div style={{ fontFamily: FONT, color: C.muted, fontSize: "11px", lineHeight: 1.7 }}>{a.note}</div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function MissionsTab({ token, toast }: { token: string; toast: (m: string, ok?: boolean) => void }) {
   const [uid, setUid]       = useState("");
   const [action, setAction] = useState<"complete"|"revoke">("complete");
