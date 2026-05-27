@@ -104,7 +104,7 @@ export const INITIATION_TASKS: InitiationTask[] = [
     category: "SIGNAL_ACQUISITION", difficulty: "initiate",
     title: "Join the Discord Den",
     desc: "Connect to the primary signal channel. The Den is where the protocol breathes.",
-    signal: 100, action: "link", link: "https://discord.gg/otterprotocol",
+    signal: 100, action: "link", link: "https://discord.gg/EGzu4NHqP",
     requiresApproval: false, repeatable: false, badge: "◆",
   },
   {
@@ -120,7 +120,7 @@ export const INITIATION_TASKS: InitiationTask[] = [
     category: "SIGNAL_ACQUISITION", difficulty: "initiate",
     title: "Follow on X",
     desc: "Intercept the primary signal stream. Protocol updates broadcast here first.",
-    signal: 150, action: "link", link: "https://x.com/otterprotocol",
+    signal: 150, action: "link", link: "https://x.com/otter_protocol1",
     requiresApproval: false, repeatable: false, badge: "✕",
   },
   {
@@ -154,7 +154,7 @@ export const INITIATION_TASKS: InitiationTask[] = [
     category: "KNOWLEDGE_ARCHIVE", difficulty: "seeker",
     title: "Read Medium Introduction",
     desc: "The first inscription. Understand what OTTER Protocol is building and why.",
-    signal: 300, action: "link", link: "https://medium.com/@otterprotocol",
+    signal: 300, action: "link", link: "https://medium.com/@protocolotter",
     requiresApproval: false, repeatable: false, badge: "📜",
   },
   {
@@ -204,7 +204,7 @@ export const INITIATION_TASKS: InitiationTask[] = [
     category: "CONTRIBUTION", difficulty: "initiate",
     title: "Like Protocol Post",
     desc: "Amplify the signal. Each resonance strengthens the network.",
-    signal: 50, action: "link", link: "https://x.com/otterprotocol",
+    signal: 50, action: "link", link: "https://x.com/otter_protocol1",
     requiresApproval: false, repeatable: true, badge: "◉",
   },
   {
@@ -212,7 +212,7 @@ export const INITIATION_TASKS: InitiationTask[] = [
     category: "CONTRIBUTION", difficulty: "initiate",
     title: "Retweet Protocol Post",
     desc: "Relay the signal. You extend the protocol's reach with every broadcast.",
-    signal: 120, action: "link", link: "https://x.com/otterprotocol",
+    signal: 120, action: "link", link: "https://x.com/otter_protocol1",
     requiresApproval: false, repeatable: true, badge: "↺",
   },
   {

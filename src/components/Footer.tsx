@@ -32,7 +32,7 @@ export default function Footer() {
 
           {[
             { title: "Protocol", links: [{ l: "EIP Proposal", h: "/eip" }, { l: "Tokenomics", h: "#tokenomics" }, { l: "Smart Contract", h: "#" }, { l: "Security Audit", h: "#" }] },
-            { title: "Community", links: [{ l: "Join the Raft", h: "#community" }, { l: "Twitter / X", h: "#" }, { l: "Medium Blog", h: "#" }, { l: "GitHub", h: "#" }] },
+            { title: "Community", links: [{ l: "Join the Raft", h: "https://discord.gg/EGzu4NHqP", ext: true }, { l: "Twitter / X", h: "https://x.com/otter_protocol1", ext: true }, { l: "Medium Blog", h: "https://medium.com/@protocolotter", ext: true }, { l: "GitHub", h: "https://github.com/nazsats/otter-protocol", ext: true }] },
             { title: "Resources", links: [{ l: "Whitepaper", h: "#" }, { l: "Brand Kit", h: "#" }, { l: "FAQ", h: "#" }, { l: "Contact", h: "#" }] },
           ].map((col) => (
             <div key={col.title}>
@@ -41,6 +41,8 @@ export default function Footer() {
               </h4>
               {col.links.map((item) => (
                 <Link key={item.l} href={item.h}
+                  target={"ext" in item && item.ext ? "_blank" : undefined}
+                  rel={"ext" in item && item.ext ? "noopener noreferrer" : undefined}
                   style={{ fontFamily: "var(--font-cinzel, serif)", display: "block", color: C.muted, textDecoration: "none", fontSize: "12px", marginBottom: "10px", transition: "color 0.15s", letterSpacing: "0.04em" }}
                   onMouseEnter={(e) => ((e.target as HTMLAnchorElement).style.color = C.text)}
                   onMouseLeave={(e) => ((e.target as HTMLAnchorElement).style.color = C.muted)}

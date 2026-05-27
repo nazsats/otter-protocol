@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const C = {
@@ -45,7 +46,7 @@ const SIGNALS = [
     sub: "INTERCEPT PRIMARY SIGNAL",
     hint: "Fragment I awaits",
     icon: "✕",
-    url: "https://x.com/otterprotocol",      // ← update
+    url: "https://x.com/otter_protocol1",
   },
   {
     id: "02",
@@ -53,7 +54,7 @@ const SIGNALS = [
     sub: "ACCESS THE DEN PROTOCOL",
     hint: "Fragment II is buried",
     icon: "◆",
-    url: "https://discord.gg/otterprotocol",  // ← update
+    url: "https://discord.gg/EGzu4NHqP",
   },
   {
     id: "03",
@@ -61,7 +62,7 @@ const SIGNALS = [
     sub: "TUNE TO FREQUENCY 03",
     hint: "Fragment III lies dormant",
     icon: "◈",
-    url: "https://t.me/otterprotocol",        // ← update
+    url: "https://t.me/otterprotocol",
   },
 ];
 
@@ -92,9 +93,14 @@ export default function GatePage() {
   const [bootDone,  setBootDone]  = useState(false);
   const [hoveredSignal, setHoveredSignal] = useState<string | null>(null);
 
-  // Random community stats (stable per session)
-  const [nodeCount] = useState(() => Math.floor(Math.random() * 80) + 190);
-  const [lastAccess] = useState(() => `${Math.floor(Math.random() * 8) + 1}m AGO`);
+  // Random community stats — initialized with stable values, randomized client-side to avoid hydration mismatch
+  const [nodeCount, setNodeCount] = useState(200);
+  const [lastAccess, setLastAccess] = useState("3m AGO");
+
+  useEffect(() => {
+    setNodeCount(Math.floor(Math.random() * 80) + 190);
+    setLastAccess(`${Math.floor(Math.random() * 8) + 1}m AGO`);
+  }, []);
 
   // Boot sequence
   useEffect(() => {
@@ -355,7 +361,7 @@ export default function GatePage() {
               animation: status==="success" ? "successPulse 1.8s ease-in-out infinite" : "coin-glow-anim 4s ease-in-out infinite",
               filter: status==="success" ? "hue-rotate(120deg) brightness(1.05)" : "none",
             }}>
-              <img src="/otter-logo.png" alt="OTTER" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
+              <Image src="/otter-logo.png" alt="OTTER" width={88} height={88} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} priority />
             </div>
           </div>
 
