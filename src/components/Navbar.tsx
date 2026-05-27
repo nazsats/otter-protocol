@@ -189,6 +189,16 @@ export default function Navbar() {
                         onClick={copyReferral}
                       />
 
+                      <Link href="/profile"
+                        onClick={() => setDropdown(false)}
+                        style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 12px", borderRadius: "8px", textDecoration: "none", color: C.text, fontSize: "13px", transition: "background 0.15s" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "#1A1A1A")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <Users size={14} color={C.muted} />
+                        My Profile
+                      </Link>
+
                       <Link href="/dapp"
                         onClick={() => setDropdown(false)}
                         style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 12px", borderRadius: "8px", textDecoration: "none", color: C.text, fontSize: "13px", transition: "background 0.15s" }}
@@ -255,6 +265,10 @@ export default function Navbar() {
                 </>
               ) : (
                 <>
+                  <Link href="/profile" onClick={() => setMobileOpen(false)}
+                    style={{ fontFamily: "var(--font-cinzel, serif)", padding: "14px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "transparent", color: C.text, fontSize: "13px", fontWeight: 700, textDecoration: "none", textAlign: "center", display: "block", letterSpacing: "0.1em" }}>
+                    MY PROFILE
+                  </Link>
                   <Link href="/dapp" onClick={() => setMobileOpen(false)}
                     style={{ fontFamily: "var(--font-cinzel, serif)", padding: "14px", borderRadius: "6px", border: `1px solid rgba(201,168,76,0.3)`, background: "rgba(201,168,76,0.06)", color: C.gold, fontSize: "13px", fontWeight: 700, textDecoration: "none", textAlign: "center", display: "block", letterSpacing: "0.1em" }}>
                     OPEN DAPP
