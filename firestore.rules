@@ -8,77 +8,96 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Referrals: auth users can read and create (create uses applyReferral logic)
+    // Referrals: auth users can read and create
     match /referrals/{referralId} {
       allow read:   if request.auth != null;
       allow create: if request.auth != null;
       allow update, delete: if false;
     }
 
-    // Mission progress: owner reads/writes their own flags
+    // Mission progress: owner reads/writes their own
     match /user_missions/{userId} {
       allow read:  if request.auth != null && request.auth.uid == userId;
       allow write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // OTTER claims: ONLY server (Admin SDK) writes — client read-only for own claims
-    // Admin SDK bypasses these rules entirely; client cannot write
+    // Initiation progress: owner reads/writes their own signal weight + tasks
+    match /user_initiation/{userId} {
+      allow read:  if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Task overrides: any auth user reads (to show admin edits), no client writes
+    match /task_overrides/{taskId} {
+      allow read:                   if request.auth != null;
+      allow create, update, delete: if false; // Admin SDK only
+    }
+
+    // Pending approvals: auth users can read own + create submissions
+    match /pending_approvals/{approvalId} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if false; // Admin SDK only
+    }
+
+    // OTTER claims: server writes, user reads own
     match /otter_claims/{claimId} {
       allow read:             if request.auth != null
                                 && request.auth.uid == resource.data.uid;
-      allow create, update, delete: if false;  // server-only via Admin SDK
+      allow create, update, delete: if false;
     }
 
-    // Drop claims: same — server writes, user reads own
+    // Drop claims: server writes, user reads own
     match /drop_claims/{claimId} {
       allow read:             if request.auth != null
                                 && request.auth.uid == resource.data.uid;
       allow create, update, delete: if false;
     }
 
-    // Drops: public read (needed for drop list + hint display), server writes
+    // Drops: public read, server writes
     match /drops/{dropId} {
-      allow read:                   if true;  // anyone can see active drops + hints
-      allow create, update, delete: if false; // admin only via Admin SDK
-    }
-
-    // Activity feed: public read, server writes only
-    match /activity/{entryId} {
       allow read:                   if true;
       allow create, update, delete: if false;
     }
 
-    // Rate limiting counters: server writes only
-    match /rate_limits/{key} {
-      allow read, write: if false; // Admin SDK only
+    // Activity feed: public read, auth users can create (task completions, joins)
+    match /activity/{entryId} {
+      allow read:   if true;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
     }
 
-    // Memes: public read (gallery), server writes only (Admin SDK)
+    // Rate limiting: server only
+    match /rate_limits/{key} {
+      allow read, write: if false;
+    }
+
+    // Memes: public read, server writes
     match /memes/{memeId} {
       allow read:                   if true;
-      allow create, update, delete: if false; // Admin SDK only
+      allow create, update, delete: if false;
     }
 
-    // Meme votes: auth users read own, server writes only
+    // Meme votes: auth users read, server writes
     match /meme_votes/{voteId} {
       allow read:                   if request.auth != null;
-      allow create, update, delete: if false; // Admin SDK only
+      allow create, update, delete: if false;
     }
 
-    // OTTER whitelist: server writes only, user reads own entry
+    // OTTER whitelist: server writes, user reads own
     match /otter_whitelist/{uid} {
       allow read:                   if request.auth != null && request.auth.uid == uid;
-      allow create, update, delete: if false; // Admin SDK only
+      allow create, update, delete: if false;
     }
 
-    // Admin settings: server reads and writes only
+    // Admin settings: server only
     match /admin_settings/{docId} {
-      allow read, write: if false; // Admin SDK only
+      allow read, write: if false;
     }
 
-    // Admin log: server writes only
+    // Admin log: server only
     match /admin_log/{entryId} {
-      allow read, write: if false; // Admin SDK only
+      allow read, write: if false;
     }
   }
 }
