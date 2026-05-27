@@ -36,8 +36,13 @@ export default function AuthModal() {
     setErr(""); setBusy(true);
     try { await fn(); closeAuthModal(); toast("Welcome to the Raft!", "success"); }
     catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Something went wrong";
-      setErr(msg.replace("Firebase: ", "").replace(/\(auth\/[^)]+\)/g, "").trim());
+      const raw = e as { code?: string; message?: string };
+      const code = raw?.code ?? "";
+      const msg  = raw?.message ?? "Something went wrong";
+      console.error("[OTTER MODAL] Auth error code:", code);
+      console.error("[OTTER MODAL] Auth error message:", msg);
+      // Show the raw Firebase error code so we can debug
+      setErr(code ? `${code}: ${msg.replace("Firebase: ", "").replace(/\(auth\/[^)]+\)/g, "").trim()}` : msg.replace("Firebase: ", "").trim());
     } finally { setBusy(false); }
   };
 

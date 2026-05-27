@@ -92,15 +92,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithTwitter = async (referralCode?: string) => {
-    const result = await signInWithPopup(auth, twitterProvider);
-    // Twitter provides the handle via providerData
-    const handle = (result.user.providerData[0]?.displayName) || result.user.displayName;
-    await createUserProfile(result.user.uid, {
-      email:       result.user.email,
-      displayName: handle,
-      referredBy:  referralCode ?? null,
-    });
-    await refreshProfile();
+    console.log("[OTTER AUTH] signInWithTwitter — start");
+    console.log("[OTTER AUTH] Firebase authDomain:", process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN);
+    console.log("[OTTER AUTH] App URL:", process.env.NEXT_PUBLIC_APP_URL);
+    try {
+      const result = await signInWithPopup(auth, twitterProvider);
+      console.log("[OTTER AUTH] signInWithPopup success — uid:", result.user.uid);
+      console.log("[OTTER AUTH] providerData:", JSON.stringify(result.user.providerData));
+      const handle = (result.user.providerData[0]?.displayName) || result.user.displayName;
+      await createUserProfile(result.user.uid, {
+        email:       result.user.email,
+        displayName: handle,
+        referredBy:  referralCode ?? null,
+      });
+      console.log("[OTTER AUTH] createUserProfile done");
+      await refreshProfile();
+      console.log("[OTTER AUTH] refreshProfile done — Twitter sign-in complete");
+    } catch (err: unknown) {
+      const e = err as { code?: string; message?: string; customData?: unknown };
+      console.error("[OTTER AUTH] Twitter sign-in FAILED");
+      console.error("[OTTER AUTH] Error code:", e?.code);
+      console.error("[OTTER AUTH] Error message:", e?.message);
+      console.error("[OTTER AUTH] Full error:", JSON.stringify(err, null, 2));
+      throw err;
+    }
   };
 
   const signInWithEmail = async (email: string, password: string) => {
