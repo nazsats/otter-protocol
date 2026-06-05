@@ -378,7 +378,7 @@ export default function GatePage() {
               animation: status==="success" ? "successPulse 1.8s ease-in-out infinite" : "coin-glow-anim 4s ease-in-out infinite",
               filter: status==="success" ? "hue-rotate(120deg) brightness(1.05)" : "none",
             }}>
-              <Image src="/otter-logo.png" alt="OTTER" width={88} height={88} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} priority />
+              <Image src="/otter-logo.png" alt="OTTER" width={88} height={88} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} priority unoptimized />
             </div>
           </div>
 
@@ -400,6 +400,73 @@ export default function GatePage() {
               : "ERC-OTTER · ETHEREUM · ACCESS REQUIRED"
             }
           </div>
+        </div>
+
+        {/* ── WAITLIST ── */}
+        <div style={{
+          background:"#030303",
+          border:`1px solid ${C.muted}`,
+          borderRadius:"6px",
+          padding:"20px",
+          marginBottom:"24px",
+        }}>
+          <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:C.gold, marginBottom:"8px" }}>
+            ◈ NO CODE? JOIN THE WAITLIST
+          </div>
+          <div style={{ fontSize:"10px", color:"#555", letterSpacing:"0.05em", lineHeight:1.7, marginBottom:"14px" }}>
+            Codes are distributed across our socials. Join the waitlist and we&apos;ll send you one when a slot opens.
+          </div>
+          {waitStatus === "done" ? (
+            <div style={{ fontSize:"11px", color:C.green, letterSpacing:"0.1em", padding:"10px 0" }}>
+              ✓ YOU&apos;RE ON THE LIST — WE&apos;LL REACH OUT SOON
+            </div>
+          ) : (
+            <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
+              <input
+                type="email"
+                placeholder="your@email.com"
+                value={waitEmail}
+                onChange={(e) => setWaitEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && submitWaitlist()}
+                disabled={waitStatus === "loading"}
+                style={{
+                  flex:1, minWidth:"160px",
+                  background:"#040404", border:`1px solid ${waitStatus === "error" ? C.red : "#222"}`,
+                  borderRadius:"4px", padding:"11px 14px",
+                  color:C.text, fontSize:"12px", fontFamily:MONO,
+                  outline:"none", letterSpacing:"0.04em",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "rgba(201,168,76,0.3)")}
+                onBlur={(e) => (e.target.style.borderColor = waitStatus === "error" ? C.red : "#222")}
+              />
+              <button
+                onClick={submitWaitlist}
+                disabled={waitStatus === "loading" || !waitEmail.trim()}
+                style={{
+                  padding:"11px 20px",
+                  background: waitStatus === "loading" ? "#040404" : "rgba(201,168,76,0.08)",
+                  border:`1px solid ${waitStatus === "loading" ? "#222" : "rgba(201,168,76,0.2)"}`,
+                  borderRadius:"4px",
+                  color: waitStatus === "loading" ? C.mutedH : C.gold,
+                  fontSize:"10px", fontFamily:MONO, fontWeight:700,
+                  letterSpacing:"0.18em", cursor: !waitEmail.trim() ? "not-allowed" : "pointer",
+                  whiteSpace:"nowrap",
+                  opacity: !waitEmail.trim() ? 0.5 : 1,
+                }}
+              >
+                {waitStatus === "loading" ? "SENDING…" : waitStatus === "error" ? "RETRY" : "JOIN WAITLIST →"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ── HAVE A CODE? ── */}
+        <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"20px" }}>
+          <div style={{ flex:1, height:"1px", background:C.muted }} />
+          <div style={{ fontSize:"8px", letterSpacing:"0.24em", color:C.mutedH }}>
+            ◈ HAVE AN ACCESS CODE?
+          </div>
+          <div style={{ flex:1, height:"1px", background:C.muted }} />
         </div>
 
         {/* ── CIPHER INPUT ── */}
@@ -514,64 +581,6 @@ export default function GatePage() {
            status==="success"  ? "> ACCESS GRANTED — ENTERING PROTOCOL" :
            "> SUBMIT CIPHER KEY →"}
         </button>
-
-        {/* ── WAITLIST ── */}
-        <div style={{
-          background:"#030303",
-          border:`1px solid ${C.muted}`,
-          borderRadius:"6px",
-          padding:"20px",
-          marginBottom:"24px",
-        }}>
-          <div style={{ fontSize:"9px", letterSpacing:"0.2em", color:C.gold, marginBottom:"8px" }}>
-            ◈ NO CODE? JOIN THE WAITLIST
-          </div>
-          <div style={{ fontSize:"10px", color:"#555", letterSpacing:"0.05em", lineHeight:1.7, marginBottom:"14px" }}>
-            Codes are distributed across our socials. Join the waitlist and we&apos;ll send you one when a slot opens.
-          </div>
-          {waitStatus === "done" ? (
-            <div style={{ fontSize:"11px", color:C.green, letterSpacing:"0.1em", padding:"10px 0" }}>
-              ✓ YOU&apos;RE ON THE LIST — WE&apos;LL REACH OUT SOON
-            </div>
-          ) : (
-            <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
-              <input
-                type="email"
-                placeholder="your@email.com"
-                value={waitEmail}
-                onChange={(e) => setWaitEmail(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && submitWaitlist()}
-                disabled={waitStatus === "loading"}
-                style={{
-                  flex:1, minWidth:"160px",
-                  background:"#040404", border:`1px solid ${waitStatus === "error" ? C.red : "#222"}`,
-                  borderRadius:"4px", padding:"11px 14px",
-                  color:C.text, fontSize:"12px", fontFamily:MONO,
-                  outline:"none", letterSpacing:"0.04em",
-                }}
-                onFocus={(e) => (e.target.style.borderColor = "rgba(201,168,76,0.3)")}
-                onBlur={(e) => (e.target.style.borderColor = waitStatus === "error" ? C.red : "#222")}
-              />
-              <button
-                onClick={submitWaitlist}
-                disabled={waitStatus === "loading" || !waitEmail.trim()}
-                style={{
-                  padding:"11px 20px",
-                  background: waitStatus === "loading" ? "#040404" : "rgba(201,168,76,0.08)",
-                  border:`1px solid ${waitStatus === "loading" ? "#222" : "rgba(201,168,76,0.2)"}`,
-                  borderRadius:"4px",
-                  color: waitStatus === "loading" ? C.mutedH : C.gold,
-                  fontSize:"10px", fontFamily:MONO, fontWeight:700,
-                  letterSpacing:"0.18em", cursor: !waitEmail.trim() ? "not-allowed" : "pointer",
-                  whiteSpace:"nowrap",
-                  opacity: !waitEmail.trim() ? 0.5 : 1,
-                }}
-              >
-                {waitStatus === "loading" ? "SENDING…" : waitStatus === "error" ? "RETRY" : "JOIN WAITLIST →"}
-              </button>
-            </div>
-          )}
-        </div>
 
         {/* ── DIVIDER ── */}
         <div style={{
