@@ -99,5 +99,16 @@ service cloud.firestore {
     match /admin_log/{entryId} {
       allow read, write: if false;
     }
+
+    // Access codes: server only (managed via admin SDK)
+    match /access_codes/{codeId} {
+      allow read, write: if false;
+    }
+
+    // Waitlist: anyone can submit an email (no auth required), no client reads
+    match /waitlist/{entryId} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
   }
 }

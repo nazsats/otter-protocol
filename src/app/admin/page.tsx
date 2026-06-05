@@ -10,7 +10,7 @@ import {
 } from "@/lib/initiation";
 import {
   Users, Settings, Star, Activity, Shield, ChevronDown,
-  Search, Plus, Trash2, Check, X, RefreshCw, BarChart3,
+  Search, Plus, Trash2, Check, X, RefreshCw, BarChart3, Key, Copy, ToggleLeft, ToggleRight, Mail,
 } from "lucide-react";
 
 const C = {
@@ -86,7 +86,7 @@ interface SeasonSettings {
   dropHuntEnabled:       boolean;
 }
 
-type Tab = "overview" | "users" | "whitelist" | "season" | "missions" | "initiation" | "approvals";
+type Tab = "overview" | "users" | "whitelist" | "season" | "missions" | "initiation" | "approvals" | "access";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function shortAddr(addr: string) {
@@ -218,6 +218,7 @@ export default function AdminPage() {
     { id: "whitelist",  label: "WHITELIST",   glyph: "ה", icon: <Star size={12} /> },
     { id: "season",     label: "SEASON",      glyph: "ו", icon: <Settings size={12} /> },
     { id: "missions",   label: "MISSIONS",    glyph: "ז", icon: <Shield size={12} /> },
+    { id: "access",     label: "ACCESS CODES", glyph: "ח", icon: <Key size={12} /> },
   ];
 
   return (
@@ -275,6 +276,7 @@ export default function AdminPage() {
           {tab === "whitelist"  && <WhitelistTab     token={token} toast={toast.show} />}
           {tab === "season"     && <SeasonTab        token={token} toast={toast.show} />}
           {tab === "missions"   && <MissionsTab      token={token} toast={toast.show} />}
+          {tab === "access"     && <AccessCodesTab   token={token} toast={toast.show} />}
         </div>
       </div>
     </>
@@ -1300,6 +1302,259 @@ function MissionsTab({ token, toast }: { token: string; toast: (m: string, ok?: 
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Access Codes Tab
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface AccessCode {
+  id:        string;
+  code:      string;
+  label:     string;
+  uses:      number;
+  active:    boolean;
+  createdAt: number;
+}
+
+interface WaitlistEntry {
+  id:        string;
+  email:     string;
+  createdAt: number;
+}
+
+function AccessCodesTab({ token, toast }: { token: string; toast: (m: string, ok?: boolean) => void }) {
+  const [codes,    setCodes]    = useState<AccessCode[]>([]);
+  const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [label,    setLabel]    = useState("");
+  const [creating, setCreating] = useState(false);
+  const [copied,   setCopied]   = useState<string | null>(null);
+  const [view,     setView]     = useState<"codes" | "waitlist">("codes");
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const [codeRes, waitRes] = await Promise.all([
+        adminFetch("/api/admin/access-codes", token),
+        adminFetch("/api/admin/waitlist", token),
+      ]);
+      setCodes(codeRes.codes ?? []);
+      setWaitlist(waitRes.entries ?? []);
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : "Failed to load", false);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const createCode = async () => {
+    setCreating(true);
+    try {
+      const newCode = await adminFetch("/api/admin/access-codes", token, {
+        method: "POST",
+        body: JSON.stringify({ label: label.trim() || "Manual" }),
+      });
+      setCodes((prev) => [newCode, ...prev]);
+      setLabel("");
+      toast(`Code created: ${formatDisplayCode(newCode.code)}`);
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : "Failed to create", false);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const deleteCode = async (id: string) => {
+    if (!confirm("Delete this access code?")) return;
+    try {
+      await adminFetch("/api/admin/access-codes", token, {
+        method: "DELETE",
+        body: JSON.stringify({ id }),
+      });
+      setCodes((prev) => prev.filter((c) => c.id !== id));
+      toast("Code deleted");
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : "Failed to delete", false);
+    }
+  };
+
+  const toggleCode = async (id: string, active: boolean) => {
+    try {
+      await adminFetch("/api/admin/access-codes", token, {
+        method: "PATCH",
+        body: JSON.stringify({ id, active: !active }),
+      });
+      setCodes((prev) => prev.map((c) => c.id === id ? { ...c, active: !active } : c));
+      toast(active ? "Code deactivated" : "Code activated");
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : "Failed to toggle", false);
+    }
+  };
+
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(formatDisplayCode(code)).catch(() => {});
+    setCopied(code);
+    setTimeout(() => setCopied(null), 1800);
+    toast("Copied to clipboard");
+  };
+
+  function formatDisplayCode(raw: string) {
+    const clean = raw.replace(/-/g, "").toUpperCase().slice(0, 24);
+    const parts: string[] = [];
+    for (let i = 0; i < clean.length; i += 6) parts.push(clean.slice(i, i + 6));
+    return parts.join("-");
+  }
+
+  function fmtTs(ms: number) {
+    if (!ms) return "—";
+    return new Date(ms).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" });
+  }
+
+  const exportWaitlist = () => {
+    const csv = ["email,date", ...waitlist.map((e) => `${e.email},${fmtTs(e.createdAt)}`)].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "waitlist.csv"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div>
+      {/* View switcher */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "28px" }}>
+        {(["codes", "waitlist"] as const).map((v) => (
+          <button key={v} onClick={() => setView(v)} style={{
+            fontFamily: FONT, fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em",
+            padding: "8px 18px", borderRadius: "6px", cursor: "pointer",
+            background: view === v ? `linear-gradient(135deg, ${C.gold}, ${C.goldL})` : "transparent",
+            color: view === v ? "#000" : C.muted,
+            border: view === v ? "none" : `1px solid ${C.border}`,
+          }}>
+            {v === "codes" ? `⟦ ACCESS CODES (${codes.length}) ⟧` : `⟦ WAITLIST (${waitlist.length}) ⟧`}
+          </button>
+        ))}
+        <button onClick={load} style={{ marginLeft: "auto", background: "none", border: `1px solid ${C.border}`, borderRadius: "6px", cursor: "pointer", padding: "8px 12px", color: C.muted }}>
+          <RefreshCw size={12} />
+        </button>
+      </div>
+
+      {view === "codes" && (
+        <>
+          {/* Create new code */}
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "20px 24px", marginBottom: "24px" }}>
+            <div style={{ fontFamily: FONT, fontSize: "10px", color: C.muted, letterSpacing: "0.14em", marginBottom: "14px" }}>⟦ GENERATE NEW CODE ⟧</div>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <input
+                placeholder="Label (e.g. Twitter giveaway, Discord event…)"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && createCode()}
+                style={{ ...inputStyle, flex: 1, minWidth: "220px", marginBottom: 0 }}
+              />
+              <AdminBtn variant="gold" onClick={createCode} disabled={creating}>
+                <Plus size={11} style={{ marginRight: "5px" }} />
+                {creating ? "GENERATING…" : "GENERATE CODE"}
+              </AdminBtn>
+            </div>
+          </div>
+
+          {/* Code list */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {codes.length === 0 && (
+              <div style={{ fontFamily: FONT, fontSize: "11px", color: C.muted, textAlign: "center", padding: "40px" }}>
+                No access codes yet. Generate one above.
+              </div>
+            )}
+            {codes.map((c) => (
+              <div key={c.id} style={{
+                background: C.card, border: `1px solid ${c.active ? C.border : C.red + "30"}`,
+                borderRadius: "10px", padding: "14px 20px",
+                display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap",
+                opacity: c.active ? 1 : 0.55,
+              }}>
+                {/* Code */}
+                <code style={{ fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: "14px", letterSpacing: "0.12em", color: c.active ? C.gold : C.muted, flex: "1 1 200px" }}>
+                  {formatDisplayCode(c.code)}
+                </code>
+
+                {/* Label */}
+                <span style={{ fontFamily: FONT, fontSize: "10px", color: C.mutedL, flex: "1 1 120px" }}>
+                  {c.label || "—"}
+                </span>
+
+                {/* Uses */}
+                <span style={{ fontFamily: FONT, fontSize: "10px", color: C.muted, minWidth: "60px" }}>
+                  {c.uses} use{c.uses !== 1 ? "s" : ""}
+                </span>
+
+                {/* Date */}
+                <span style={{ fontFamily: FONT, fontSize: "10px", color: C.mutedL, minWidth: "70px" }}>
+                  {fmtTs(c.createdAt)}
+                </span>
+
+                {/* Status badge */}
+                <Tag color={c.active ? C.green : C.red}>{c.active ? "ACTIVE" : "DISABLED"}</Tag>
+
+                {/* Actions */}
+                <div style={{ display: "flex", gap: "6px", marginLeft: "auto" }}>
+                  <button onClick={() => copyCode(c.code)} title="Copy code"
+                    style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "6px 8px", cursor: "pointer", color: copied === c.code ? C.green : C.muted }}>
+                    <Copy size={12} />
+                  </button>
+                  <button onClick={() => toggleCode(c.id, c.active)} title={c.active ? "Deactivate" : "Activate"}
+                    style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "6px 8px", cursor: "pointer", color: c.active ? C.amber : C.green }}>
+                    {c.active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
+                  </button>
+                  <button onClick={() => deleteCode(c.id)} title="Delete"
+                    style={{ background: "none", border: `1px solid ${C.red}30`, borderRadius: "6px", padding: "6px 8px", cursor: "pointer", color: C.red }}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {view === "waitlist" && (
+        <>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+            <div style={{ fontFamily: FONT, fontSize: "10px", color: C.muted, letterSpacing: "0.12em" }}>
+              {waitlist.length} email{waitlist.length !== 1 ? "s" : ""} waiting
+            </div>
+            <AdminBtn variant="outline" small onClick={exportWaitlist}>
+              <Mail size={10} style={{ marginRight: "5px" }} /> EXPORT CSV
+            </AdminBtn>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {waitlist.length === 0 && (
+              <div style={{ fontFamily: FONT, fontSize: "11px", color: C.muted, textAlign: "center", padding: "40px" }}>
+                No waitlist entries yet.
+              </div>
+            )}
+            {waitlist.map((entry, i) => (
+              <div key={entry.id} style={{
+                background: C.card, border: `1px solid ${C.border}`, borderRadius: "8px",
+                padding: "12px 18px", display: "flex", alignItems: "center", gap: "16px",
+              }}>
+                <span style={{ fontFamily: FONT, fontSize: "10px", color: C.mutedL, minWidth: "32px" }}>#{i + 1}</span>
+                <span style={{ fontFamily: FONT, fontSize: "12px", color: C.text, flex: 1 }}>{entry.email}</span>
+                <span style={{ fontFamily: FONT, fontSize: "10px", color: C.mutedL }}>{fmtTs(entry.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
