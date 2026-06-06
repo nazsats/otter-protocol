@@ -114,7 +114,10 @@ export default function DAppPage() {
       referralCount: profile?.referralCount ?? 0,
       isOnSepolia:   walletCorrectNet,
       hasTx:         !!lastTx,
-    });
+    })
+      .then(() => getUserMissions(user.uid))
+      .then((c) => setProgress(calcProgress(c)))
+      .catch(() => {});
   }, [user, walletAddr, walletCorrectNet, profile?.referralCount, lastTx]);
 
   useEffect(() => { fetchChain(); }, [fetchChain]);
@@ -123,10 +126,6 @@ export default function DAppPage() {
     getLeaderboard().then(setLeaders).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (!user) return;
-    getUserMissions(user.uid).then((c) => setProgress(calcProgress(c)));
-  }, [user]);
 
   // ── SEND OTTER ───────────────────────────────────────────────────────────
   const handleSend = async () => {

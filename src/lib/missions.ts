@@ -1,4 +1,4 @@
-import { doc, setDoc, getDoc, collection, getDocs, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection, getDocs, serverTimestamp, increment } from "firebase/firestore";
 import { db } from "./firebase";
 
 // ─── MISSION DEFINITIONS ─────────────────────────────────────────────────────
@@ -144,13 +144,8 @@ export async function completeMission(uid: string, missionId: string): Promise<v
 async function addPointsToUser(uid: string, missionId: string) {
   const mission = MISSIONS.find((m) => m.id === missionId);
   if (!mission) return;
-
-  const userRef = doc(db, "users", uid);
-  const snap    = await getDoc(userRef);
-  if (!snap.exists()) return;
-
-  const current = snap.data().points || 0;
-  await setDoc(userRef, { points: current + mission.points, updatedAt: serverTimestamp() }, { merge: true });
+  // Use increment() — atomic, race-condition-safe, works even if field doesn't exist yet
+  await setDoc(doc(db, "users", uid), { points: increment(mission.points), updatedAt: serverTimestamp() }, { merge: true });
 }
 
 export function calcProgress(completed: Record<string, boolean>) {

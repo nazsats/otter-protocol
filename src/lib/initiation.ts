@@ -1,4 +1,4 @@
-import { doc, setDoc, getDoc, collection, getDocs, serverTimestamp, query, orderBy, limit, addDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection, getDocs, serverTimestamp, query, orderBy, limit, addDoc, increment } from "firebase/firestore";
 import { db } from "./firebase";
 import { ethers } from "ethers";
 
@@ -487,13 +487,8 @@ export async function recordTaskOffchain(
     [taskId]: { taskId, signal, txHash: txHash || null, timestamp: Date.now(), approved: true },
   });
 
-  // Update total signal weight in user profile
-  const userRef  = doc(db, "users", uid);
-  const userSnap = await getDoc(userRef);
-  if (userSnap.exists()) {
-    const current = userSnap.data().signalWeight || 0;
-    await setDoc(userRef, { signalWeight: current + signal, updatedAt: serverTimestamp() }, { merge: true });
-  }
+  // Update total signal weight — atomic increment, works even if field doesn't exist yet
+  await setDoc(doc(db, "users", uid), { signalWeight: increment(signal), updatedAt: serverTimestamp() }, { merge: true });
 
   // Log to activity feed
   await addDoc(collection(db, "activity"), {
