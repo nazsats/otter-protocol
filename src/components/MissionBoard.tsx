@@ -25,11 +25,12 @@ const C = {
 const FONT = "var(--font-cinzel, Georgia, serif)";
 const MONO = "var(--font-geist-mono, monospace)";
 
-export default function MissionBoard({ uid, walletAddress, referralCount, isOnSepolia }: {
+export default function MissionBoard({ uid, walletAddress, referralCount, isOnSepolia, onComplete }: {
   uid: string;
   walletAddress?: string | null;
   referralCount?: number;
   isOnSepolia?: boolean;
+  onComplete?: () => void;
 }) {
   const toast = useToast();
   const [completed,     setCompleted]     = useState<Record<string, boolean>>({});
@@ -66,6 +67,7 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
         setCompleted((c) => ({ ...c, [missionId]: true }));
         const m = MISSIONS.find((m) => m.id === missionId);
         toast(`+${m?.points} pts — ${m?.title} complete!`, "success");
+        onComplete?.();
         setClaiming(null);
       }, 1500);
       return;
@@ -81,6 +83,7 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
     setCompleted((c) => ({ ...c, [missionId]: true }));
     const m = MISSIONS.find((m) => m.id === missionId);
     toast(`+${m?.points} pts — ${m?.title} complete!`, "success");
+    onComplete?.();
     setClaiming(null);
   };
 

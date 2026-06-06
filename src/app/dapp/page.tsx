@@ -129,13 +129,18 @@ export default function DAppPage() {
     getLeaderboard().then(setLeaders).catch(() => {});
   }, []);
 
-  // Load initiation signal weight
-  useEffect(() => {
+  // Load initiation signal weight — also called as callback when tasks complete
+  const refreshPoints = useCallback(async () => {
     if (!user) return;
-    getUserInitiation(user.uid)
-      .then((data) => setInitSignal(calcInitiationProgress(data).signal))
-      .catch(() => {});
-  }, [user, tab]); // refresh when switching to dashboard tab
+    const [missions, initiation] = await Promise.all([
+      getUserMissions(user.uid),
+      getUserInitiation(user.uid),
+    ]);
+    setProgress(calcProgress(missions));
+    setInitSignal(calcInitiationProgress(initiation).signal);
+  }, [user]);
+
+  useEffect(() => { refreshPoints(); }, [refreshPoints, tab]);
 
 
   // ── SEND OTTER ───────────────────────────────────────────────────────────
@@ -511,7 +516,7 @@ export default function DAppPage() {
             {tab === "initiation" && (
               <div style={{ animation: "tab-slide 0.3s ease both" }}>
                 {user
-                  ? <InitiationTerminal />
+                  ? <InitiationTerminal onTaskComplete={refreshPoints} />
                   : (
                     <div style={{
                       background: "#0D0B07", border: "1px solid #1E1A10",
@@ -544,6 +549,7 @@ export default function DAppPage() {
                       walletAddress={walletAddr}
                       referralCount={profile?.referralCount}
                       isOnSepolia={walletCorrectNet}
+                      onComplete={refreshPoints}
                     />
                   : <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "40px", textAlign: "center" }}>
                       <Zap size={32} color={C.gold} style={{ marginBottom: "12px" }} />

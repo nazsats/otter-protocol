@@ -295,7 +295,7 @@ function TaskCard({
 }
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-export default function InitiationTerminal() {
+export default function InitiationTerminal({ onTaskComplete }: { onTaskComplete?: () => void }) {
   const { user, profile } = useAuth();
   const toast  = useToast();
   const wallet = useWallet();
@@ -384,6 +384,7 @@ export default function InitiationTerminal() {
           toast(`+${task.signal} SIGNAL — ${task.title}`, "success");
           await loadCompleted();
           await loadOnChain();
+          onTaskComplete?.();
           setBusy(null);
           return;
         }
@@ -395,6 +396,7 @@ export default function InitiationTerminal() {
       addLog(`> SIGNAL RECORDED: +${task.signal}`);
       toast(`+${task.signal} SIGNAL — ${task.title}`, "success");
       await loadCompleted();
+      onTaskComplete?.();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Unknown error";
       addLog(`> TX FAILED: ${msg.slice(0, 50)}`);
