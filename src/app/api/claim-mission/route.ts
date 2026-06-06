@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     // ── 3. Find mission (server-authoritative amount) ────
     const mission = MISSIONS.find((m) => m.id === missionId);
     if (!mission) return err("Unknown mission", 400);
-    if (!CONTRACT) return err("Contract not configured", 500);
+    if (!CONTRACT) return err("Contract not deployed yet — check back soon", 503);
 
     const db = getAdminDb();
 
@@ -63,8 +63,10 @@ export async function POST(req: NextRequest) {
       if (!missionsSnap.exists || !missionsSnap.data()![missionId])
         throw new Error("Mission not completed");
 
-      // Check already claimed
-      if (claimSnap.exists) { alreadyClaimed = true; return; }
+      // Check already claimed (complete) — pending means a stuck reservation, allow retry
+      if (claimSnap.exists && claimSnap.data()?.status === "complete") {
+        alreadyClaimed = true; return;
+      }
 
       // Reserve the claim slot atomically (prevents double-spend)
       tx.set(claimRef, {
@@ -132,6 +134,8 @@ export async function POST(req: NextRequest) {
     if (msg.includes("Wallet does not match"))  return err("Wallet mismatch", 403);
     if (msg.includes("Mission not completed"))  return err("Mission not completed", 403);
     if (msg.includes("Insufficient treasury"))  return err("Treasury low — contact admin", 503);
+    if (msg.includes("DEPLOYER_PRIVATE_KEY"))   return err("Treasury wallet not configured — deploy contract first", 503);
+    if (msg.includes("Invalid contract"))       return err("Contract not deployed yet — check back soon", 503);
     if (msg.includes("rejected") || msg.includes("denied")) return err("Transaction rejected", 400);
     // Log full error server-side only
     console.error("[claim-mission] uid redacted —", msg);

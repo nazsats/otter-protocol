@@ -1,6 +1,6 @@
 "use client";
 import { Wallet, AlertTriangle, ExternalLink, LogOut, Copy, Check } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWallet } from "@/hooks/useWallet";
 import { useToast } from "@/context/ToastContext";
 
@@ -71,6 +71,28 @@ export default function WalletConnect() {
   } = useWallet();
   const toast  = useToast();
   const [copied, setCopied] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  // Render a stable placeholder until client hydration is complete
+  if (!mounted) {
+    return (
+      <StonePanel>
+        <div style={{ padding: "18px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px", paddingBottom: "12px", borderBottom: "1px solid rgba(201,168,76,0.07)" }}>
+            <div style={{ width: "30px", height: "30px", borderRadius: "6px", background: "rgba(201,168,76,0.07)", border: "1px solid rgba(201,168,76,0.14)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Wallet size={13} color={C.gold} />
+            </div>
+            <div>
+              <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: "11px", color: C.text, letterSpacing: "0.12em" }}>WALLET INTERFACE</div>
+              <div style={{ fontFamily: MONO, color: C.muted, fontSize: "9px", letterSpacing: "0.1em", marginTop: "2px" }}>STATUS: LOADING…</div>
+            </div>
+          </div>
+          <div style={{ height: "72px", background: "rgba(201,168,76,0.03)", borderRadius: "4px", border: "1px solid rgba(201,168,76,0.06)" }} />
+        </div>
+      </StonePanel>
+    );
+  }
 
   const copyAddress = () => {
     if (!address) return;

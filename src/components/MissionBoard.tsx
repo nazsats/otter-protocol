@@ -99,6 +99,14 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
         body:    JSON.stringify({ uid, missionId, walletAddress }),
       });
       const data = await res.json();
+
+      // 409 = already claimed — mark as claimed in UI without error
+      if (res.status === 409) {
+        setClaimed((c) => ({ ...c, [missionId]: true }));
+        toast("OTTER already received for this mission ✓", "success");
+        return;
+      }
+
       if (!res.ok) throw new Error(data.error || "Claim failed");
       setClaimed((c) => ({ ...c, [missionId]: true }));
       if (data.txHash) setClaimedTxs((t) => ({ ...t, [missionId]: data.txHash }));
@@ -106,7 +114,7 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
       toast(`${m?.otterAmount} OTTER sent to your wallet!`, "success");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Claim failed";
-      toast(msg === "Already claimed" ? "OTTER already claimed for this mission" : msg, "error");
+      toast(msg, "error");
     }
     setClaimingOtter(null);
   };
@@ -481,21 +489,30 @@ function ActionButtons({
 
 // ── Fetch claimed OTTER missions ──────────────────────────────────────────
 async function fetchClaimed(uid: string): Promise<{ flags: Record<string, boolean>; txs: Record<string, string> }> {
+  const flags: Record<string, boolean> = {};
+  const txs:   Record<string, string>  = {};
   try {
-    const flags: Record<string, boolean> = {};
-    const txs:   Record<string, string>  = {};
     await Promise.all(
       MISSIONS.map(async (m) => {
-        const snap = await getDoc(doc(db, "otter_claims", `${uid}_${m.id}`));
-        if (snap.exists()) {
-          flags[m.id] = true;
-          const h = snap.data()?.txHash as string | undefined;
-          if (h) txs[m.id] = h;
+        try {
+          const snap = await getDoc(doc(db, "otter_claims", `${uid}_${m.id}`));
+          if (snap.exists()) {
+            const d = snap.data();
+            // Only mark as claimed if the transfer actually completed
+            if (d?.status === "complete" || d?.txHash) {
+              flags[m.id] = true;
+              if (d?.txHash) txs[m.id] = d.txHash as string;
+            }
+          }
+        } catch {
+          // Individual doc read failed — skip silently (permission issue / not exists)
         }
       })
     );
-    return { flags, txs };
-  } catch { return { flags: {}, txs: {} }; }
+  } catch {
+    // Outer failure (e.g. network) — return whatever we collected
+  }
+  return { flags, txs };
 }
 
 function Spin() {
