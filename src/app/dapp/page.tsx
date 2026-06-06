@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { useWallet } from "@/hooks/useWallet";
 import { autoCompleteMissions, getLeaderboard, calcProgress, getUserMissions } from "@/lib/missions";
+import { getUserInitiation, calcInitiationProgress } from "@/lib/initiation";
 import { ethers } from "ethers";
 import {
   Zap, Trophy, Shield, RefreshCw, ExternalLink, Copy,
@@ -79,6 +80,8 @@ export default function DAppPage() {
 
   // Missions summary
   const [progress,   setProgress]   = useState({ done: 0, total: 0, pts: 0, pct: 0 });
+  // Initiation signal weight (separate system)
+  const [initSignal, setInitSignal] = useState(0);
 
   // ── FETCH ON-CHAIN DATA ──────────────────────────────────────────────────
   const fetchChain = useCallback(async () => {
@@ -125,6 +128,14 @@ export default function DAppPage() {
   useEffect(() => {
     getLeaderboard().then(setLeaders).catch(() => {});
   }, []);
+
+  // Load initiation signal weight
+  useEffect(() => {
+    if (!user) return;
+    getUserInitiation(user.uid)
+      .then((data) => setInitSignal(calcInitiationProgress(data).signal))
+      .catch(() => {});
+  }, [user, tab]); // refresh when switching to dashboard tab
 
 
   // ── SEND OTTER ───────────────────────────────────────────────────────────
@@ -354,15 +365,22 @@ export default function DAppPage() {
                         fontFamily: "var(--font-cinzel, serif)",
                         color: C.mutedH, fontSize: "11px", fontWeight: 700,
                         letterSpacing: "0.14em", marginBottom: "8px",
-                      }}>◈ OTTER POINTS</div>
+                      }}>◈ TOTAL POINTS</div>
                       <div style={{ fontSize: "48px", fontWeight: 900, background: `linear-gradient(135deg, ${C.gold}, ${C.goldL})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", lineHeight: 1 }}>
-                        {user ? (profile?.referralCount !== undefined ? progress.pts.toLocaleString() : "—") : "—"}
+                        {user ? (progress.pts + initSignal).toLocaleString() : "—"}
                       </div>
                       <div style={{
                         fontFamily: "var(--font-geist-mono)",
-                        color: C.mutedH, fontSize: "11px", marginTop: "6px", letterSpacing: "0.06em",
+                        color: C.mutedH, fontSize: "10px", marginTop: "8px", letterSpacing: "0.06em",
+                        display: "flex", gap: "14px", flexWrap: "wrap",
                       }}>
-                        {user ? `${progress.done}/${progress.total} missions · ${progress.pct}% complete` : "sign in to track points"}
+                        {user ? (
+                          <>
+                            <span><span style={{ color: C.gold }}>{progress.pts.toLocaleString()}</span> missions</span>
+                            <span style={{ color: C.mutedH }}>+</span>
+                            <span><span style={{ color: C.green }}>{initSignal.toLocaleString()}</span> signal</span>
+                          </>
+                        ) : "sign in to track points"}
                       </div>
                     </div>
                     <div style={{ textAlign: "right" }}>

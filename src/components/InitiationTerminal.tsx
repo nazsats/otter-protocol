@@ -437,12 +437,14 @@ export default function InitiationTerminal() {
   };
 
   // ── Derived state ─────────────────────────────────────────────────────────
-  const signal      = onChain?.signalWeight ?? (profile as { signalWeight?: number })?.signalWeight ?? 0;
+  // progress.signal is always fresh (recalculates from completed after every loadCompleted())
+  // Use it as the source of truth when on-chain isn't available
+  const progress    = calcInitiationProgress(completed);
+  const signal      = onChain?.signalWeight ?? progress.signal;
   const tierName    = getTierFromWeight(signal);
   const tierMeta    = TIERS[tierName];
   const nextTier    = getNextTier(tierName);
   const pctToNext   = nextTier ? Math.min(100, Math.round((signal / nextTier.threshold) * 100)) : 100;
-  const progress    = calcInitiationProgress(completed);
   const nodeStreak  = onChain?.nodeStreak ?? 0;
   const nodeReward  = nodePresenceReward(nodeStreak + 1);
   const canCheckIn  = !onChain || onChain.nodeCooldown === 0;
