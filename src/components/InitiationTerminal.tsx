@@ -362,38 +362,55 @@ export default function InitiationTerminal({ onTaskComplete, contractAddress }: 
 
   useEffect(() => { loadOnChain(); }, [loadOnChain]);
 
-  // ── Claim task (on-chain tx) ───────────────────────────────────────────────
+  // ── Claim task ────────────────────────────────────────────────────────────
   const handleClaim = useCallback(async (task: InitiationTask) => {
     if (!user) { toast("Sign in to claim", "error"); return; }
     if (completed[task.id]) { toast("Already inscribed", "info"); return; }
 
     setBusy(task.id);
-    addLog(`> INITIATING TX: ${task.id.toUpperCase()}`);
+    addLog(`> INITIATING: ${task.id.toUpperCase()}`);
 
-    try {
-      // Try on-chain first
-      if (wallet.isConnected && wallet.isCorrectNetwork && LIVE_CONTRACT) {
+    // ── Try on-chain ────────────────────────────────────────────────────────
+    if (wallet.isConnected && wallet.isCorrectNetwork && LIVE_CONTRACT) {
+      try {
         const signer = await wallet.getSigner();
-        if (signer) {
-          const contract = new ethers.Contract(LIVE_CONTRACT!, INITIATION_ABI, signer);
-          const tx = await contract.claimTask(task.contractId);
-          addLog(`> TX BROADCAST: ${tx.hash.slice(0, 16)}…`);
-          toast("Transaction broadcast — waiting for confirmation…", "info");
-          await tx.wait();
-          addLog(`> SIGNAL CONFIRMED ON-CHAIN ✓`);
-          addLog(`> +${task.signal} SIGNAL WEIGHT INSCRIBED`);
-          await recordTaskOffchain(user.uid, task.id, task.signal, tx.hash);
-          toast(`+${task.signal} SIGNAL — ${task.title}`, "success");
-          await loadCompleted();
-          await loadOnChain();
-          onTaskComplete?.();
+        if (!signer) throw new Error("No signer");
+        const contract = new ethers.Contract(LIVE_CONTRACT!, INITIATION_ABI, signer);
+        const tx = await contract.claimTask(task.contractId);
+        addLog(`> TX BROADCAST: ${tx.hash.slice(0, 16)}…`);
+        toast("Transaction broadcast — waiting…", "info");
+        await tx.wait();
+        addLog(`> SIGNAL CONFIRMED ON-CHAIN ✓`);
+        addLog(`> +${task.signal} SIGNAL INSCRIBED`);
+        await recordTaskOffchain(user.uid, task.id, task.signal, tx.hash);
+        toast(`+${task.signal} SIGNAL — ${task.title}`, "success");
+        await loadCompleted();
+        await loadOnChain();
+        onTaskComplete?.();
+        setBusy(null);
+        return;
+      } catch (e: unknown) {
+        const raw = e instanceof Error ? e.message : String(e);
+        // User cancelled — stop here
+        if (raw.toLowerCase().includes("rejected") || raw.toLowerCase().includes("denied") || raw.toLowerCase().includes("cancelled")) {
+          addLog(`> TX CANCELLED BY USER`);
+          toast("Transaction cancelled", "info");
           setBusy(null);
           return;
         }
+        // Contract not deployed / call reverted — fall through to off-chain
+        const readable = raw.includes("CALL_EXCEPTION") || raw.includes("UNPREDICTABLE_GAS") || raw.includes("BAD_DATA") || raw.includes("could not decode")
+          ? "Contract not deployed at this address — recording off-chain"
+          : raw.slice(0, 80);
+        addLog(`> ON-CHAIN FAILED: ${readable}`);
+        addLog(`> FALLING BACK TO OFF-CHAIN MODE`);
+        toast("On-chain failed — recording off-chain instead", "info");
       }
+    }
 
-      // Off-chain fallback (no contract deployed yet)
-      addLog(`> OFF-CHAIN MODE — RECORDING LOCALLY`);
+    // ── Off-chain fallback ──────────────────────────────────────────────────
+    try {
+      addLog(`> OFF-CHAIN MODE — RECORDING`);
       await recordTaskOffchain(user.uid, task.id, task.signal);
       addLog(`> SIGNAL RECORDED: +${task.signal}`);
       toast(`+${task.signal} SIGNAL — ${task.title}`, "success");
@@ -401,11 +418,11 @@ export default function InitiationTerminal({ onTaskComplete, contractAddress }: 
       onTaskComplete?.();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Unknown error";
-      addLog(`> TX FAILED: ${msg.slice(0, 50)}`);
-      toast(msg.includes("rejected") ? "Transaction cancelled" : "Claim failed", "error");
+      addLog(`> FAILED: ${msg.slice(0, 50)}`);
+      toast("Failed to record signal — please try again", "error");
     }
     setBusy(null);
-  }, [user, completed, wallet, loadCompleted, loadOnChain, toast]);
+  }, [user, completed, wallet, LIVE_CONTRACT, loadCompleted, loadOnChain, toast]);
 
   // ── Node presence ─────────────────────────────────────────────────────────
   const handleNodePresence = async () => {

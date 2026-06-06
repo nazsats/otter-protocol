@@ -178,8 +178,16 @@ export default function DAppPage() {
       setSendTo(""); setSendAmt("");
       fetchChain();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Transaction failed";
-      toast(msg.includes("rejected") ? "Transaction cancelled" : "Send failed: " + msg.slice(0, 60), "error");
+      const raw = e instanceof Error ? e.message : "Transaction failed";
+      if (raw.toLowerCase().includes("rejected") || raw.toLowerCase().includes("denied")) {
+        toast("Transaction cancelled", "info");
+      } else if (raw.includes("CALL_EXCEPTION") || raw.includes("UNPREDICTABLE_GAS") || raw.includes("BAD_DATA")) {
+        toast("Contract not responding — is it deployed on Sepolia?", "error");
+      } else if (raw.includes("insufficient funds")) {
+        toast("Insufficient Sepolia ETH for gas — get some at sepoliafaucet.com", "error");
+      } else {
+        toast("Send failed: " + raw.slice(0, 80), "error");
+      }
     }
     setSendBusy(false);
   };
@@ -199,8 +207,14 @@ export default function DAppPage() {
       toast("Rewards claimed!", "success");
       fetchChain();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Claim failed";
-      toast(msg.includes("rejected") ? "Cancelled" : "Claim failed", "error");
+      const raw = e instanceof Error ? e.message : "Claim failed";
+      if (raw.toLowerCase().includes("rejected") || raw.toLowerCase().includes("denied")) {
+        toast("Cancelled", "info");
+      } else if (raw.includes("NothingToClaim") || raw.includes("nothing to claim")) {
+        toast("No rewards to claim yet — hold longer to earn", "info");
+      } else {
+        toast("Claim failed — " + raw.slice(0, 60), "error");
+      }
     }
     setClaimBusy(false);
   };
@@ -601,6 +615,18 @@ export default function DAppPage() {
             {/* ════ ON-CHAIN ════ */}
             {tab === "onchain" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+                {!CONTRACT_ADDRESS && (
+                  <div style={{ background: "rgba(245,166,35,0.06)", border: "1px solid rgba(245,166,35,0.25)", borderRadius: "12px", padding: "16px 20px", display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                    <AlertTriangle size={16} color={C.orange} style={{ flexShrink: 0, marginTop: "2px" }} />
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: "13px", color: C.orange, marginBottom: "4px" }}>Contract not deployed yet</div>
+                      <div style={{ color: C.muted, fontSize: "12px", lineHeight: 1.6 }}>
+                        The OTTER token contract hasn&apos;t been deployed to Sepolia. Deploy it from the <code style={{ background: "rgba(245,166,35,0.1)", padding: "1px 5px", borderRadius: "3px", fontSize: "11px" }}>contracts/</code> folder, then set the address in <strong>Admin → ⚙ Config → Contract Addresses</strong>.
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {!walletConnected && (
                   <div style={{ background: "rgba(201,168,76,0.04)", border: `1px solid rgba(201,168,76,0.12)`, borderRadius: "12px", padding: "20px", display: "flex", alignItems: "center", gap: "14px" }}>
