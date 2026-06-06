@@ -295,8 +295,10 @@ function TaskCard({
 }
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-export default function InitiationTerminal({ onTaskComplete }: { onTaskComplete?: () => void }) {
+export default function InitiationTerminal({ onTaskComplete, contractAddress }: { onTaskComplete?: () => void; contractAddress?: string | null }) {
   const { user, profile } = useAuth();
+  // Use prop address first (from Firestore), fall back to env var
+  const LIVE_CONTRACT = contractAddress ?? INITIATION_CONTRACT;
   const toast  = useToast();
   const wallet = useWallet();
 
@@ -332,11 +334,11 @@ export default function InitiationTerminal({ onTaskComplete }: { onTaskComplete?
 
   // ── Load on-chain state ────────────────────────────────────────────────────
   const loadOnChain = useCallback(async () => {
-    if (!wallet.address || !wallet.isCorrectNetwork || !INITIATION_CONTRACT) return;
+    if (!wallet.address || !wallet.isCorrectNetwork || !LIVE_CONTRACT) return;
     try {
       const provider = wallet.getProvider();
       if (!provider) return;
-      const contract = new ethers.Contract(INITIATION_CONTRACT, INITIATION_ABI, provider);
+      const contract = new ethers.Contract(LIVE_CONTRACT!, INITIATION_ABI, provider);
       const [weight, tier, streak, cooldown, rec] = await Promise.all([
         contract.getSignalWeight(wallet.address),
         contract.getTier(wallet.address),
@@ -370,10 +372,10 @@ export default function InitiationTerminal({ onTaskComplete }: { onTaskComplete?
 
     try {
       // Try on-chain first
-      if (wallet.isConnected && wallet.isCorrectNetwork && INITIATION_CONTRACT) {
+      if (wallet.isConnected && wallet.isCorrectNetwork && LIVE_CONTRACT) {
         const signer = await wallet.getSigner();
         if (signer) {
-          const contract = new ethers.Contract(INITIATION_CONTRACT, INITIATION_ABI, signer);
+          const contract = new ethers.Contract(LIVE_CONTRACT!, INITIATION_ABI, signer);
           const tx = await contract.claimTask(task.contractId);
           addLog(`> TX BROADCAST: ${tx.hash.slice(0, 16)}…`);
           toast("Transaction broadcast — waiting for confirmation…", "info");
@@ -416,10 +418,10 @@ export default function InitiationTerminal({ onTaskComplete }: { onTaskComplete?
     setNodeLoading(true);
     addLog("> RECORDING NODE PRESENCE…");
     try {
-      if (wallet.isConnected && wallet.isCorrectNetwork && INITIATION_CONTRACT) {
+      if (wallet.isConnected && wallet.isCorrectNetwork && LIVE_CONTRACT) {
         const signer   = await wallet.getSigner();
         if (!signer) throw new Error("No signer");
-        const contract = new ethers.Contract(INITIATION_CONTRACT, INITIATION_ABI, signer);
+        const contract = new ethers.Contract(LIVE_CONTRACT!, INITIATION_ABI, signer);
         const tx = await contract.recordNodePresence();
         addLog(`> TX BROADCAST: ${tx.hash.slice(0, 16)}…`);
         await tx.wait();
@@ -583,7 +585,7 @@ export default function InitiationTerminal({ onTaskComplete }: { onTaskComplete?
                   <Activity size={12} />
                   {nodeLoading ? "BROADCASTING…" : canCheckIn ? "RECORD NODE PRESENCE" : "COOLDOWN ACTIVE"}
                 </button>
-                {wallet.isConnected && INITIATION_CONTRACT && (
+                {wallet.isConnected && LIVE_CONTRACT && (
                   <span style={{ fontFamily: MONO, fontSize: "8px", color: C.green }}>
                     ● ON-CHAIN TX WILL EXECUTE ON SEPOLIA
                   </span>
@@ -733,7 +735,7 @@ export default function InitiationTerminal({ onTaskComplete }: { onTaskComplete?
           </div>
           {[
             { label: "NETWORK",  value: "SEPOLIA", color: C.green },
-            { label: "CONTRACT", value: INITIATION_CONTRACT ? INITIATION_CONTRACT.slice(0, 10) + "…" : "NOT DEPLOYED", color: INITIATION_CONTRACT ? C.gold : C.amber },
+            { label: "CONTRACT", value: LIVE_CONTRACT ? LIVE_CONTRACT.slice(0, 10) + "…" : "NOT DEPLOYED", color: LIVE_CONTRACT ? C.gold : C.amber },
             { label: "TX MODE",  value: wallet.isConnected && wallet.isCorrectNetwork ? "ON-CHAIN" : "OFF-CHAIN", color: wallet.isConnected && wallet.isCorrectNetwork ? C.green : C.amber },
           ].map((row) => (
             <div key={row.label} style={{
@@ -747,7 +749,7 @@ export default function InitiationTerminal({ onTaskComplete }: { onTaskComplete?
           ))}
           {INITIATION_CONTRACT && (
             <a
-              href={`https://sepolia.etherscan.io/address/${INITIATION_CONTRACT}`}
+              href={`https://sepolia.etherscan.io/address/${LIVE_CONTRACT}`}
               target="_blank" rel="noopener noreferrer"
               style={{
                 display: "flex", alignItems: "center", gap: "5px",

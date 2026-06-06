@@ -13,6 +13,8 @@ import { useToast } from "@/context/ToastContext";
 import { useWallet } from "@/hooks/useWallet";
 import { autoCompleteMissions, getLeaderboard, calcProgress, getUserMissions } from "@/lib/missions";
 import { getUserInitiation, calcInitiationProgress } from "@/lib/initiation";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { ethers } from "ethers";
 import {
   Zap, Trophy, Shield, RefreshCw, ExternalLink, Copy,
@@ -37,7 +39,9 @@ const OTTER_ABI = [
   "function claimRewards() returns (uint256)",
 ];
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_OTTER_CONTRACT || null;
+// Contract addresses — set as env var fallbacks, overridden by Firestore admin_settings/contracts
+const ENV_OTTER_CONTRACT      = process.env.NEXT_PUBLIC_OTTER_CONTRACT      || null;
+const ENV_INITIATION_CONTRACT = process.env.NEXT_PUBLIC_INITIATION_CONTRACT || null;
 const TIER_LABELS  = ["NEWCOMER", "MEMBER", "OG"];
 const TIER_COLORS  = [C.muted,    C.purple, C.gold];
 const TIER_BG      = ["rgba(92,92,92,0.08)", "rgba(167,139,250,0.08)", "rgba(201,168,76,0.08)"];
@@ -58,6 +62,19 @@ export default function DAppPage() {
   const walletConnected  = wallet.isConnected;
   const getProvider      = wallet.getProvider;
   const getSigner        = wallet.getSigner;
+
+  // Contract addresses — loaded from Firestore (admin-updatable without redeploy)
+  const [CONTRACT_ADDRESS,      setContractAddress]      = useState<string | null>(ENV_OTTER_CONTRACT);
+  const [INITIATION_ADDRESS,    setInitiationAddress]    = useState<string | null>(ENV_INITIATION_CONTRACT);
+
+  useEffect(() => {
+    getDoc(doc(db, "admin_settings", "contracts")).then((snap) => {
+      if (!snap.exists()) return;
+      const d = snap.data();
+      if (d.otterContract)      setContractAddress(d.otterContract      || null);
+      if (d.initiationContract) setInitiationAddress(d.initiationContract || null);
+    }).catch(() => {});
+  }, []);
 
   // On-chain data
   const [balance,    setBalance]    = useState<string | null>(null);
@@ -516,7 +533,7 @@ export default function DAppPage() {
             {tab === "initiation" && (
               <div style={{ animation: "tab-slide 0.3s ease both" }}>
                 {user
-                  ? <InitiationTerminal onTaskComplete={refreshPoints} />
+                  ? <InitiationTerminal onTaskComplete={refreshPoints} contractAddress={INITIATION_ADDRESS} />
                   : (
                     <div style={{
                       background: "#0D0B07", border: "1px solid #1E1A10",

@@ -86,7 +86,7 @@ interface SeasonSettings {
   dropHuntEnabled:       boolean;
 }
 
-type Tab = "overview" | "users" | "whitelist" | "season" | "missions" | "initiation" | "approvals" | "access";
+type Tab = "overview" | "users" | "whitelist" | "season" | "missions" | "initiation" | "approvals" | "access" | "config";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function shortAddr(addr: string) {
@@ -219,6 +219,7 @@ export default function AdminPage() {
     { id: "season",     label: "SEASON",      glyph: "ו", icon: <Settings size={12} /> },
     { id: "missions",   label: "MISSIONS",    glyph: "ז", icon: <Shield size={12} /> },
     { id: "access",     label: "ACCESS CODES", glyph: "ח", icon: <Key size={12} /> },
+    { id: "config",     label: "⚙ CONFIG",     glyph: "ט", icon: <Settings size={12} /> },
   ];
 
   return (
@@ -277,6 +278,7 @@ export default function AdminPage() {
           {tab === "season"     && <SeasonTab        token={token} toast={toast.show} />}
           {tab === "missions"   && <MissionsTab      token={token} toast={toast.show} />}
           {tab === "access"     && <AccessCodesTab   token={token} toast={toast.show} />}
+          {tab === "config"     && <ConfigTab        token={token} toast={toast.show} />}
         </div>
       </div>
     </>
@@ -1554,6 +1556,244 @@ function AccessCodesTab({ token, toast }: { token: string; toast: (m: string, ok
             ))}
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Config Tab — Contracts, Social Links, Mission Overrides
+// ═══════════════════════════════════════════════════════════════════════════
+
+function ConfigTab({ token, toast }: { token: string; toast: (m: string, ok?: boolean) => void }) {
+  // ── Contracts ──────────────────────────────────────────────────────────
+  const [contracts, setContracts] = useState({ otterContract: "", initiationContract: "", network: "sepolia" });
+  const [savingC,   setSavingC]   = useState(false);
+
+  // ── Social Links ────────────────────────────────────────────────────────
+  const [social,  setSocial]  = useState({ twitter: "", discord: "", medium: "", telegram: "", website: "" });
+  const [savingS, setSavingS] = useState(false);
+
+  // ── Mission Overrides ───────────────────────────────────────────────────
+  const [overrides,    setOverrides]    = useState<Record<string, { title?: string; desc?: string; points?: number; link?: string; active?: boolean }>>({});
+  const [editMission,  setEditMission]  = useState<string | null>(null);
+  const [editFields,   setEditFields]   = useState({ title: "", desc: "", points: 0, link: "", active: true });
+  const [savingM,      setSavingM]      = useState(false);
+  const [loadingM,     setLoadingM]     = useState(true);
+
+  const { MISSIONS } = require("@/lib/missions") as { MISSIONS: { id: string; title: string; desc: string; points: number; link?: string; category: string }[] };
+
+  useEffect(() => {
+    if (!token) return;
+    Promise.all([
+      adminFetch("/api/admin/contracts",  token),
+      adminFetch("/api/admin/social-links", token),
+      adminFetch("/api/admin/mission-overrides", token),
+    ]).then(([c, s, m]) => {
+      setContracts(c);
+      setSocial(s);
+      setOverrides(m.overrides ?? {});
+      setLoadingM(false);
+    }).catch((e: unknown) => {
+      toast(e instanceof Error ? e.message : "Failed to load config", false);
+      setLoadingM(false);
+    });
+  }, [token, toast]);
+
+  const saveContracts = async () => {
+    setSavingC(true);
+    try {
+      await adminFetch("/api/admin/contracts", token, { method: "POST", body: JSON.stringify(contracts) });
+      toast("Contract addresses saved — app will use new addresses immediately");
+    } catch (e: unknown) { toast(e instanceof Error ? e.message : "Save failed", false); }
+    setSavingC(false);
+  };
+
+  const saveSocial = async () => {
+    setSavingS(true);
+    try {
+      await adminFetch("/api/admin/social-links", token, { method: "POST", body: JSON.stringify(social) });
+      toast("Social links saved");
+    } catch (e: unknown) { toast(e instanceof Error ? e.message : "Save failed", false); }
+    setSavingS(false);
+  };
+
+  const openMissionEdit = (m: { id: string; title: string; desc: string; points: number; link?: string }) => {
+    const ov = overrides[m.id] ?? {};
+    setEditFields({ title: ov.title ?? m.title, desc: ov.desc ?? m.desc, points: ov.points ?? m.points, link: ov.link ?? m.link ?? "", active: ov.active !== false });
+    setEditMission(m.id);
+  };
+
+  const saveMissionEdit = async () => {
+    if (!editMission) return;
+    setSavingM(true);
+    try {
+      await adminFetch("/api/admin/mission-overrides", token, { method: "POST", body: JSON.stringify({ missionId: editMission, ...editFields }) });
+      setOverrides((p) => ({ ...p, [editMission]: editFields }));
+      toast(`Mission updated: ${editMission}`);
+      setEditMission(null);
+    } catch (e: unknown) { toast(e instanceof Error ? e.message : "Save failed", false); }
+    setSavingM(false);
+  };
+
+  const resetMission = async (missionId: string) => {
+    try {
+      await adminFetch("/api/admin/mission-overrides", token, { method: "DELETE", body: JSON.stringify({ missionId }) });
+      setOverrides((p) => { const n = { ...p }; delete n[missionId]; return n; });
+      toast("Mission reset to default");
+    } catch (e: unknown) { toast(e instanceof Error ? e.message : "Failed", false); }
+  };
+
+  const catColor: Record<string, string> = { onboarding: C.green, social: C.purple, onchain: C.gold, community: "#F5A623" };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+
+      {/* ── CONTRACT ADDRESSES ── */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "24px" }}>
+        <div style={{ fontFamily: FONT, fontSize: "10px", color: C.gold, letterSpacing: "0.18em", marginBottom: "20px" }}>⟦ CONTRACT ADDRESSES ⟧</div>
+        <p style={{ fontFamily: FONT, fontSize: "11px", color: C.muted, marginBottom: "20px", lineHeight: 1.7 }}>
+          Update contract addresses here — the app reads from Firestore at runtime, no redeploy needed.
+        </p>
+
+        <Label>OTTER TOKEN CONTRACT (Sepolia)</Label>
+        <input value={contracts.otterContract} onChange={(e) => setContracts({ ...contracts, otterContract: e.target.value })}
+          placeholder="0x…" style={inputStyle} />
+
+        <Label>INITIATION CONTRACT (Sepolia)</Label>
+        <input value={contracts.initiationContract} onChange={(e) => setContracts({ ...contracts, initiationContract: e.target.value })}
+          placeholder="0x…" style={inputStyle} />
+
+        <Label>NETWORK</Label>
+        <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+          {["sepolia", "mainnet"].map((n) => (
+            <button key={n} onClick={() => setContracts({ ...contracts, network: n })}
+              style={{ fontFamily: FONT, fontSize: "10px", fontWeight: 700, padding: "6px 18px", borderRadius: "6px", cursor: "pointer", border: "none", letterSpacing: "0.08em",
+                background: contracts.network === n ? (n === "mainnet" ? C.gold : C.green) : C.border,
+                color: contracts.network === n ? "#000" : C.muted,
+              }}>
+              {n.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        <AdminBtn variant="gold" onClick={saveContracts} disabled={savingC}>
+          {savingC ? "SAVING…" : "SAVE CONTRACT ADDRESSES"}
+        </AdminBtn>
+      </div>
+
+      {/* ── SOCIAL LINKS ── */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "24px" }}>
+        <div style={{ fontFamily: FONT, fontSize: "10px", color: C.gold, letterSpacing: "0.18em", marginBottom: "20px" }}>⟦ SOCIAL LINKS ⟧</div>
+
+        {[
+          { key: "twitter",  label: "TWITTER / X" },
+          { key: "discord",  label: "DISCORD INVITE" },
+          { key: "medium",   label: "MEDIUM BLOG" },
+          { key: "telegram", label: "TELEGRAM CHANNEL" },
+          { key: "website",  label: "WEBSITE" },
+        ].map(({ key, label }) => (
+          <div key={key}>
+            <Label>{label}</Label>
+            <input value={(social as Record<string, string>)[key] ?? ""} onChange={(e) => setSocial({ ...social, [key]: e.target.value })}
+              placeholder="https://…" style={inputStyle} />
+          </div>
+        ))}
+
+        <div style={{ marginTop: "16px" }}>
+          <AdminBtn variant="gold" onClick={saveSocial} disabled={savingS}>
+            {savingS ? "SAVING…" : "SAVE SOCIAL LINKS"}
+          </AdminBtn>
+        </div>
+      </div>
+
+      {/* ── MISSION OVERRIDES ── */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "24px" }}>
+        <div style={{ fontFamily: FONT, fontSize: "10px", color: C.gold, letterSpacing: "0.18em", marginBottom: "8px" }}>⟦ MISSION DEFINITIONS ⟧</div>
+        <p style={{ fontFamily: FONT, fontSize: "11px", color: C.muted, marginBottom: "20px", lineHeight: 1.7 }}>
+          Edit mission titles, descriptions, point values, links, or disable missions entirely.
+          Overridden fields are shown in gold. Reset restores the default.
+        </p>
+
+        {loadingM ? <Spinner /> : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "10px" }}>
+            {MISSIONS.map((m) => {
+              const ov = overrides[m.id];
+              const isOverridden = !!ov;
+              const isDisabled   = ov?.active === false;
+              return (
+                <div key={m.id} style={{
+                  background: C.cardH, border: `1px solid ${isDisabled ? C.red + "40" : isOverridden ? C.gold + "30" : C.border}`,
+                  borderRadius: "8px", padding: "14px", opacity: isDisabled ? 0.6 : 1,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                    <span style={{ fontFamily: FONT, fontSize: "11px", fontWeight: 700, color: isOverridden ? C.gold : C.text, flex: 1, letterSpacing: "0.04em" }}>
+                      {ov?.title ?? m.title}
+                    </span>
+                    <Tag color={catColor[m.category] || C.muted}>{m.category.slice(0, 4).toUpperCase()}</Tag>
+                  </div>
+                  <div style={{ fontFamily: FONT, fontSize: "10px", color: C.muted, marginBottom: "10px", lineHeight: 1.6 }}>
+                    {ov?.desc ?? m.desc}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontFamily: "var(--font-geist-mono,monospace)", fontSize: "11px", color: isOverridden ? C.gold : C.mutedL, fontWeight: 700 }}>
+                      +{ov?.points ?? m.points} pts
+                      {isDisabled && <span style={{ color: C.red, marginLeft: "8px" }}>DISABLED</span>}
+                    </span>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      {isOverridden && (
+                        <AdminBtn small variant="ghost" onClick={() => resetMission(m.id)}>RESET</AdminBtn>
+                      )}
+                      <AdminBtn small variant="outline" onClick={() => openMissionEdit(m)}>EDIT</AdminBtn>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── MISSION EDIT MODAL ── */}
+      {editMission && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setEditMission(null); }}>
+          <div style={{ background: "#0D0B07", border: `1px solid ${C.gold}40`, borderRadius: "14px", padding: "28px", width: "100%", maxWidth: "520px" }}>
+            <div style={{ fontFamily: FONT, fontSize: "11px", color: C.gold, letterSpacing: "0.18em", marginBottom: "20px" }}>
+              EDIT MISSION — {editMission.toUpperCase()}
+            </div>
+
+            <Label>TITLE</Label>
+            <input value={editFields.title} onChange={(e) => setEditFields({ ...editFields, title: e.target.value })} style={inputStyle} />
+
+            <Label>DESCRIPTION</Label>
+            <textarea value={editFields.desc} onChange={(e) => setEditFields({ ...editFields, desc: e.target.value })} rows={3}
+              style={{ ...inputStyle, resize: "vertical", height: "auto" }} />
+
+            <Label>LINK (optional)</Label>
+            <input value={editFields.link} onChange={(e) => setEditFields({ ...editFields, link: e.target.value })} placeholder="https://…" style={inputStyle} />
+
+            <Label>POINTS</Label>
+            <input type="number" value={editFields.points} onChange={(e) => setEditFields({ ...editFields, points: Number(e.target.value) })} style={inputStyle} />
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: `1px solid ${C.border}`, marginBottom: "20px" }}>
+              <span style={{ fontFamily: FONT, fontSize: "12px", color: C.text }}>Mission Active</span>
+              <button onClick={() => setEditFields({ ...editFields, active: !editFields.active })}
+                style={{ width: "44px", height: "24px", borderRadius: "12px", border: "none", cursor: "pointer",
+                  background: editFields.active ? C.green : C.border, position: "relative", transition: "background 0.2s" }}>
+                <div style={{ position: "absolute", top: "3px", left: editFields.active ? "23px" : "3px",
+                  width: "18px", height: "18px", borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
+              </button>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <AdminBtn variant="gold" onClick={saveMissionEdit} disabled={savingM}>
+                {savingM ? "SAVING…" : "SAVE CHANGES"}
+              </AdminBtn>
+              <AdminBtn variant="outline" onClick={() => setEditMission(null)}>CANCEL</AdminBtn>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

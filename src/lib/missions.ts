@@ -122,6 +122,51 @@ export const CATEGORY_META: Record<MissionCategory, { label: string; color: stri
   community:  { label: "Community",   color: "#F5A623", desc: "Grow the Raft"          },
 };
 
+// ─── MISSION OVERRIDES (admin-editable) ──────────────────────────────────────
+
+export interface MissionOverride {
+  missionId: string;
+  title?:    string;
+  desc?:     string;
+  link?:     string;
+  points?:   number;
+  active?:   boolean;
+  updatedAt: number;
+}
+
+export async function saveMissionOverride(
+  missionId: string,
+  fields: Partial<Omit<MissionOverride, "missionId" | "updatedAt">>
+): Promise<void> {
+  await setDoc(doc(db, "mission_overrides", missionId), { missionId, ...fields, updatedAt: Date.now() }, { merge: true });
+}
+
+export async function getMissionOverrides(): Promise<Record<string, MissionOverride>> {
+  const snap = await getDocs(collection(db, "mission_overrides"));
+  const out: Record<string, MissionOverride> = {};
+  snap.docs.forEach((d) => { out[d.id] = d.data() as MissionOverride; });
+  return out;
+}
+
+export function applyMissionOverrides(missions: Mission[], overrides: Record<string, MissionOverride>): Mission[] {
+  return missions
+    .map((m) => {
+      const ov = overrides[m.id];
+      if (!ov) return m;
+      return {
+        ...m,
+        ...(ov.title  !== undefined && { title:  ov.title  }),
+        ...(ov.desc   !== undefined && { desc:   ov.desc   }),
+        ...(ov.link   !== undefined && { link:   ov.link   }),
+        ...(ov.points !== undefined && { points: ov.points }),
+      };
+    })
+    .filter((m) => {
+      const ov = overrides[m.id];
+      return !ov || ov.active !== false;
+    });
+}
+
 // ─── FIRESTORE OPS ───────────────────────────────────────────────────────────
 
 export async function getUserMissions(uid: string): Promise<Record<string, boolean>> {
