@@ -2,8 +2,9 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Link from "next/link";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import Image from "next/image";
 import {
   Shield, Zap, Users, TrendingUp, Lock, Award, ArrowRight,
   CheckCircle, Circle, Copy,
@@ -147,27 +148,23 @@ function CoinLogo({ size = 100 }: { size?: number }) {
       overflow: "hidden", flexShrink: 0, position: "relative",
       boxShadow: "0 0 0 2px rgba(201,168,76,0.5), 0 0 0 6px rgba(201,168,76,0.08), 0 0 60px rgba(201,168,76,0.25)",
     }}>
-      <img
+      <Image
         src="/otter-logo.png"
         alt="OTTER Protocol"
+        width={120} height={120}
         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        priority unoptimized
       />
     </div>
   );
 }
 
-// ── Floating Artifact (stone/animal/accessory) ────────────────────────────
+// ── Floating Artifact — reduced to 4 for cleaner look ─────────────────────
 const ARTIFACTS = [
-  { el: "🦦", label: "otter",   size: 64,  opacity: 0.12, cls: "rune-float-1", top: "12%", left: "3%" },
-  { el: "🗿", label: "stone",   size: 56,  opacity: 0.10, cls: "rune-float-2", top: "68%", left: "2%" },
-  { el: "🪨", label: "rock",    size: 48,  opacity: 0.10, cls: "rune-float-3", top: "30%", right: "3%" },
-  { el: "🦦", label: "otter2",  size: 72,  opacity: 0.10, cls: "rune-float-4", top: "78%", right: "4%" },
-  { el: "🏺", label: "vase",    size: 52,  opacity: 0.09, cls: "rune-float-5", top: "50%", left: "48%" },
-  { el: "⚱️", label: "urn",     size: 44,  opacity: 0.08, cls: "rune-float-1", top: "20%", right: "12%" },
-  { el: "🦦", label: "otter3",  size: 80,  opacity: 0.07, cls: "rune-float-2", top: "88%", left: "20%" },
-  { el: "🗡️", label: "sword",   size: 44,  opacity: 0.09, cls: "rune-float-3", top: "45%", right: "9%" },
-  { el: "🌊", label: "wave",    size: 60,  opacity: 0.07, cls: "rune-float-4", top: "60%", left: "7%" },
-  { el: "⚙️", label: "gear",    size: 50,  opacity: 0.08, cls: "rune-float-5", top: "8%",  right: "22%" },
+  { el: "🦦", label: "otter",  size: 64, opacity: 0.10, cls: "rune-float-1", top: "12%", left: "3%" },
+  { el: "🦦", label: "otter2", size: 72, opacity: 0.08, cls: "rune-float-4", top: "78%", right: "4%" },
+  { el: "🌊", label: "wave",   size: 60, opacity: 0.06, cls: "rune-float-4", top: "60%", left: "7%" },
+  { el: "◈",  label: "glyph",  size: 40, opacity: 0.07, cls: "rune-float-2", top: "30%", right: "3%" },
 ];
 
 // ── Particle Field ────────────────────────────────────────────────────────
@@ -342,8 +339,6 @@ export default function AboutPage() {
   const { openAuthModal, user } = useAuth();
   const [referralCode, setReferralCode] = useState("");
   const [copied, setCopied]             = useState(false);
-  const [booted, setBooted]             = useState(false);
-  const [showBoot, setShowBoot]         = useState(true);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -353,13 +348,9 @@ export default function AboutPage() {
   }, []);
 
   const copyLink = () => { navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-  const onBootDone = useCallback(() => { setBooted(true); setTimeout(() => setShowBoot(false), 700); }, []);
 
   return (
     <div style={{ background: C.black, color: C.text, minHeight: "100vh", overflow: "hidden" }}>
-
-      {/* Boot screen */}
-      {showBoot && <BootSequence onDone={onBootDone} />}
 
       {/* Global styles */}
       <style>{`
@@ -377,7 +368,7 @@ export default function AboutPage() {
       `}</style>
 
       {/* Fixed particles */}
-      {booted && <ParticleField />}
+      <ParticleField />
 
       {/* Fixed scanline */}
       <div style={{
@@ -389,10 +380,7 @@ export default function AboutPage() {
 
       <Navbar />
 
-      <div style={{
-        opacity: booted ? 1 : 0,
-        transition: "opacity 0.8s ease 0.3s",
-      }}>
+      <div>
 
         {/* ═══ HERO ════════════════════════════════════════════════════════ */}
         <section style={{ position: "relative", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "64px", overflow: "hidden" }}>
@@ -408,12 +396,6 @@ export default function AboutPage() {
               radial-gradient(ellipse 30% 40% at 15% 80%, rgba(139,96,0,0.05) 0%, transparent 50%),
               radial-gradient(ellipse 30% 40% at 85% 20%, rgba(139,96,0,0.05) 0%, transparent 50%)
             `,
-          }} />
-
-          {/* CRT scanlines overlay */}
-          <div style={{
-            position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1,
-            background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)",
           }} />
 
           {/* Floating historical artifacts */}
@@ -434,18 +416,16 @@ export default function AboutPage() {
             </div>
           ))}
 
-          {/* Hebrew rune floaters */}
+          {/* Subtle rune floaters — 2 only */}
           {[
-            { ch: "שׁ", top: "18%", left: "6%",  size: 70, cls: "rune-float-1" },
-            { ch: "ᚠ",  top: "72%", left: "4%",  size: 55, cls: "rune-float-2" },
-            { ch: "◈",  top: "28%", right: "6%", size: 65, cls: "rune-float-3" },
-            { ch: "א",  top: "76%", right: "5%", size: 82, cls: "rune-float-4" },
+            { ch: "◈", top: "22%", left: "5%",  size: 60 },
+            { ch: "א", top: "72%", right: "5%", size: 70 },
           ].map((r) => (
-            <div key={r.ch} className={r.cls} style={{
+            <div key={r.ch} style={{
               position: "absolute", top: r.top,
               left: (r as {left?: string}).left, right: (r as {right?: string}).right,
               fontSize: r.size, fontFamily: MONO, color: C.gold,
-              opacity: 0.07, pointerEvents: "none", userSelect: "none", zIndex: 0,
+              opacity: 0.05, pointerEvents: "none", userSelect: "none", zIndex: 0,
             }}>{r.ch}</div>
           ))}
 
@@ -489,15 +469,14 @@ export default function AboutPage() {
               </span>
             </h1>
 
-            <p style={{ fontFamily: FONT, fontSize: "clamp(14px, 1.8vw, 18px)", color: C.mutedH, maxWidth: "560px", margin: "0 auto 12px", lineHeight: 1.8 }}>
-              The first community-owned meme token standard on Ethereum.{" "}
-              <span style={{ color: C.text, fontWeight: 600 }}>ERC-OTTER</span> makes community
-              protection a cryptographic guarantee — not a social promise.
-            </p>
-
-            {/* Ancient quote */}
-            <p style={{ fontFamily: MONO, color: "rgba(201,168,76,0.4)", fontSize: "11px", letterSpacing: "0.14em", marginBottom: "48px" }}>
-              ━ ב ━ Like the merchants of Mohenjo-daro, we standardize trust ━ ד ━
+            <p style={{ fontFamily: FONT, fontSize: "clamp(15px, 1.8vw, 18px)", color: C.mutedH, maxWidth: "560px", margin: "0 auto 48px", lineHeight: 1.85 }}>
+              The first{" "}
+              <span style={{ color: C.text, fontWeight: 700 }}>community-owned</span>{" "}
+              meme token standard on Ethereum.{" "}
+              <span style={{ color: C.gold, fontWeight: 700 }}>ERC-OTTER</span>{" "}
+              makes community protection a{" "}
+              <span style={{ color: C.text, fontWeight: 600 }}>cryptographic guarantee</span>
+              {" "}— not a social promise.
             </p>
 
             {referralCode && !user && (
@@ -562,24 +541,12 @@ export default function AboutPage() {
               <h2 style={{ fontFamily: FONT, fontSize: "clamp(26px, 4vw, 42px)", fontWeight: 700, lineHeight: 1.15, letterSpacing: "0.01em", marginBottom: "20px" }}>
                 Meme tokens are built to fail their communities.
               </h2>
-              <p style={{ fontFamily: FONT, color: C.mutedH, fontSize: "15px", lineHeight: 1.9, marginBottom: "24px", letterSpacing: "0.02em" }}>
-                There is no standard preventing developers from draining liquidity, disabling taxes,
-                or abandoning projects. Community trust is based on social promises.
-                ERC-OTTER replaces promises with code.
+              <p style={{ fontFamily: FONT, color: C.mutedH, fontSize: "15px", lineHeight: 1.9, marginBottom: "28px", letterSpacing: "0.02em" }}>
+                There is <span style={{ color: C.text, fontWeight: 600 }}>no standard</span> preventing
+                developers from draining liquidity or abandoning projects.
+                Community trust is a social promise.{" "}
+                <span style={{ color: C.gold, fontWeight: 700 }}>ERC-OTTER replaces promises with code.</span>
               </p>
-              <div style={{ borderLeft: `2px solid rgba(201,168,76,0.3)`, paddingLeft: "16px", marginBottom: "24px" }}>
-                <p style={{ fontFamily: MONO, color: "rgba(201,168,76,0.5)", fontSize: "11px", letterSpacing: "0.12em", lineHeight: 1.9 }}>
-                  ⟦ The Harappan civilization had standardized weights{"\n"}
-                  and communal grain stores 4,000 years before DeFi.{"\n"}
-                  The principle is not new — the encoding is. ⟧
-                </p>
-              </div>
-              {/* Stone artifacts row */}
-              <div style={{ display: "flex", gap: "16px", alignItems: "center", marginBottom: "24px", opacity: 0.5 }}>
-                {["🪨","🗿","🏺","⚱️","🗡️"].map((e, i) => (
-                  <span key={i} style={{ fontSize: "22px", filter: "sepia(0.8)", animation: `artifactDrift ${6 + i * 1.5}s ${i * 0.8}s ease-in-out infinite` }}>{e}</span>
-                ))}
-              </div>
               <Link href="/eip" style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: C.gold, textDecoration: "none", fontSize: "12px", fontWeight: 600, fontFamily: FONT, letterSpacing: "0.06em" }}>
                 READ THE FULL PROPOSAL <ArrowRight size={12} />
               </Link>
@@ -588,18 +555,18 @@ export default function AboutPage() {
             <Reveal delay={150}>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 {[
-                  { glyph: "ג", icon: Shield,     title: "No anti-rug standard",    desc: "Devs can remove liquidity at any time — there is no on-chain enforcement." },
-                  { glyph: "ד", icon: Zap,         title: "No contribution incentive", desc: "Holders have no reward mechanism for loyalty, governance, or content creation." },
-                  { glyph: "ה", icon: TrendingUp,  title: "Zero-sum speculation",    desc: "No utility, no standard, no sustainability. Just hype cycles ending in dumps." },
+                  { glyph: "ג", icon: Shield,     title: "No anti-rug protection",   desc: "Devs can drain liquidity at any time — zero on-chain enforcement exists." },
+                  { glyph: "ד", icon: Zap,         title: "Holders earn nothing",     desc: "No reward for loyalty, governance participation, or content creation." },
+                  { glyph: "ה", icon: TrendingUp,  title: "Built to pump and dump",   desc: "Without a standard, every meme token ends the same way." },
                 ].map((item) => (
                   <StoneCard key={item.title} style={{ padding: "20px", display: "flex", gap: "16px", alignItems: "flex-start" }}>
                     <span style={{ position: "absolute", right: "14px", bottom: "8px", fontFamily: MONO, fontSize: "30px", color: "rgba(201,168,76,0.05)", userSelect: "none" }}>{item.glyph}</span>
-                    <div style={{ width: "38px", height: "38px", borderRadius: "6px", flexShrink: 0, background: "rgba(201,168,76,0.07)", border: "1px solid rgba(201,168,76,0.14)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <item.icon size={17} color={C.gold} />
+                    <div style={{ width: "38px", height: "38px", borderRadius: "6px", flexShrink: 0, background: "rgba(255,69,69,0.06)", border: "1px solid rgba(255,69,69,0.14)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <item.icon size={17} color={C.red} />
                     </div>
                     <div>
                       <h3 style={{ fontFamily: FONT, fontWeight: 700, fontSize: "13px", marginBottom: "4px", color: C.text, letterSpacing: "0.04em" }}>{item.title}</h3>
-                      <p style={{ fontFamily: FONT, color: C.muted, fontSize: "12px", lineHeight: 1.75, letterSpacing: "0.02em" }}>{item.desc}</p>
+                      <p style={{ fontFamily: FONT, color: C.mutedH, fontSize: "13px", lineHeight: 1.75, letterSpacing: "0.02em" }}>{item.desc}</p>
                     </div>
                   </StoneCard>
                 ))}
@@ -670,12 +637,12 @@ export default function AboutPage() {
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "14px" }}>
               {[
-                { glyph: "ח", icon: Lock,      title: "Locked Liquidity",   desc: "Contract-enforced liquidity lock. No override, no escape hatch.", tag: "ANTI-RUG",    seal: "I",   emoji: "🔒" },
-                { glyph: "ט", icon: Zap,        title: "Auto Tax Split",     desc: "5% per transfer — 40% treasury, 30% rewards, 20% liquidity, 10% burn.", tag: "BUILT-IN",   seal: "II",  emoji: "⚡" },
-                { glyph: "י", icon: Award,      title: "Holder Tiers",       desc: "Newcomer → Member → OG. Hold longer, earn more. Automatically tracked.", tag: "LOYALTY",    seal: "III", emoji: "🏺" },
-                { glyph: "כ", icon: Users,      title: "Meme Voting",        desc: "Submit and vote on-chain. Top creators earn from the rewards pool.", tag: "COMMUNITY",  seal: "IV",  emoji: "🦦" },
-                { glyph: "ל", icon: Shield,     title: "DAO Governance",     desc: "Treasury decisions via on-chain votes. OG holders have maximum weight.", tag: "GOVERNANCE", seal: "V",   emoji: "🗿" },
-                { glyph: "מ", icon: TrendingUp, title: "Referral Engine",    desc: "Built-in on-chain referral tracking. Grow the community, earn rewards.", tag: "GROWTH",     seal: "VI",  emoji: "🌊" },
+                { glyph: "ח", icon: Lock,      title: "Locked Liquidity",   desc: "Liquidity is locked by the contract. No admin key, no escape hatch.", tag: "ANTI-RUG",    seal: "I",   emoji: "🔒" },
+                { glyph: "ט", icon: Zap,        title: "5% Auto Tax Split",  desc: "40% community · 30% creators · 20% liquidity · 10% burn. Every transfer.", tag: "BUILT-IN",   seal: "II",  emoji: "⚡" },
+                { glyph: "י", icon: Award,      title: "Holder Tiers",       desc: "Hold longer, earn more. NEWCOMER → MEMBER → OG, tracked automatically.", tag: "LOYALTY",    seal: "III", emoji: "🏺" },
+                { glyph: "כ", icon: Users,      title: "Meme Voting",        desc: "On-chain meme submissions and voting. Top creators earn from the pool.", tag: "COMMUNITY",  seal: "IV",  emoji: "🦦" },
+                { glyph: "ל", icon: Shield,     title: "DAO Governance",     desc: "Every treasury decision is an on-chain vote. OG holders have 2× weight.", tag: "GOVERNANCE", seal: "V",   emoji: "🗿" },
+                { glyph: "מ", icon: TrendingUp, title: "Referral Engine",    desc: "Invite others, track on-chain. Top referrers earn bonus allocation at launch.", tag: "GROWTH",     seal: "VI",  emoji: "🌊" },
               ].map((item, idx) => (
                 <Reveal key={item.title} delay={idx * 60}>
                   <StoneCard style={{ padding: "24px", height: "100%", cursor: "default", transition: "border-color 0.2s" }}
@@ -695,7 +662,7 @@ export default function AboutPage() {
                       </div>
                     </div>
                     <h3 style={{ fontFamily: FONT, fontWeight: 700, fontSize: "14px", marginBottom: "8px", color: C.text, letterSpacing: "0.04em" }}>{item.title}</h3>
-                    <p style={{ fontFamily: FONT, color: C.muted, fontSize: "12px", lineHeight: 1.8, letterSpacing: "0.02em" }}>{item.desc}</p>
+                    <p style={{ fontFamily: FONT, color: C.mutedH, fontSize: "13px", lineHeight: 1.8, letterSpacing: "0.02em" }}>{item.desc}</p>
                   </StoneCard>
                 </Reveal>
               ))}
@@ -890,22 +857,16 @@ export default function AboutPage() {
           <div style={{ maxWidth: "800px", margin: "0 auto", textAlign: "center", position: "relative", zIndex: 1 }}>
             <Reveal>
               <AncientLabel hebrewChar="ת">The Raft</AncientLabel>
-              <div style={{ fontFamily: MONO, color: "rgba(201,168,76,0.2)", fontSize: "13px", letterSpacing: "0.2em", marginBottom: "28px", userSelect: "none" }}>
-                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              </div>
               <h2 style={{ fontFamily: FONT, fontSize: "clamp(30px, 5vw, 60px)", fontWeight: 900, lineHeight: 1.05, marginBottom: "20px", letterSpacing: "0.01em" }}>
-                We are building in public.<br />
+                Building in public.<br />
                 <span style={{ background: `linear-gradient(135deg, ${C.gold}, ${C.goldL})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                   Come build with us.
                 </span>
               </h2>
-              <p style={{ fontFamily: FONT, color: C.mutedH, fontSize: "14px", lineHeight: 1.9, marginBottom: "48px", maxWidth: "520px", margin: "0 auto 48px", letterSpacing: "0.02em" }}>
-                Every line of code, every EIP discussion, every decision is open. The Raft
-                is the community — and the community owns the protocol.
+              <p style={{ fontFamily: FONT, color: C.mutedH, fontSize: "15px", lineHeight: 1.9, marginBottom: "40px", maxWidth: "520px", margin: "0 auto 40px", letterSpacing: "0.02em" }}>
+                Every line of code and every EIP discussion is open.{" "}
+                <span style={{ color: C.text, fontWeight: 600 }}>The community owns the protocol.</span>
               </p>
-              <div style={{ fontFamily: MONO, color: "rgba(201,168,76,0.3)", fontSize: "12px", letterSpacing: "0.18em", marginBottom: "40px" }}>
-                ⟦ אבגדהוזחטי ⟧ &nbsp;🦦 OTTER PROTOCOL 🦦&nbsp; ⟦ כלמנסעפצקר ⟧
-              </div>
               <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap", marginBottom: "48px" }}>
                 <button onClick={openAuthModal} style={{ background: `linear-gradient(135deg, ${C.gold}, ${C.goldL})`, color: "#000", border: "none", borderRadius: "4px", padding: "14px 36px", fontWeight: 700, fontSize: "14px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "8px", fontFamily: FONT, letterSpacing: "0.06em", boxShadow: "0 0 30px rgba(201,168,76,0.3)" }}>
                   JOIN THE RAFT <ArrowRight size={14} />
@@ -919,25 +880,22 @@ export default function AboutPage() {
             <Reveal delay={100}>
               <div className="community-socials" style={{ display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap" }}>
                 {[
-                  { label: "X / Twitter", sub: "@OTTERProtocol", glyph: "𝕏",  emoji: "" },
-                  { label: "Medium",      sub: "Blog & Updates", glyph: "M",   emoji: "" },
-                  { label: "GitHub",      sub: "Open Source",    glyph: "</>", emoji: "" },
-                  { label: "ETH Magicians",sub: "EIP Discussion",glyph: "⊕",  emoji: "" },
+                  { label: "X / Twitter", sub: "@otter_protocol1",  glyph: "𝕏",   href: "https://x.com/otter_protocol1" },
+                  { label: "Discord",     sub: "Join the Den",       glyph: "◆",   href: "https://discord.gg/EGzu4NHqP" },
+                  { label: "Medium",      sub: "Blog & Updates",     glyph: "M",   href: "https://medium.com/@protocolotter" },
+                  { label: "GitHub",      sub: "Open Source",        glyph: "</>", href: "https://github.com/nazsats/otter-protocol" },
                 ].map((s) => (
-                  <a key={s.label} href="#" style={{ background: C.card, border: `1px solid rgba(201,168,76,0.1)`, borderRadius: "6px", padding: "14px 18px", textDecoration: "none", transition: "border-color 0.2s, background 0.2s", textAlign: "center", minWidth: "120px" }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(201,168,76,0.3)"; (e.currentTarget as HTMLAnchorElement).style.background = C.cardAlt; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(201,168,76,0.1)"; (e.currentTarget as HTMLAnchorElement).style.background = C.card; }}>
-                    <div style={{ fontFamily: MONO, color: "rgba(201,168,76,0.4)", fontSize: "16px", marginBottom: "4px" }}>{s.glyph}</div>
-                    <div style={{ color: C.text, fontWeight: 600, fontSize: "12px", fontFamily: FONT }}>{s.label}</div>
-                    <div style={{ color: C.muted, fontSize: "11px", marginTop: "2px" }}>{s.sub}</div>
+                  <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer"
+                    style={{ background: C.card, border: `1px solid rgba(201,168,76,0.12)`, borderRadius: "8px", padding: "14px 18px", textDecoration: "none", transition: "border-color 0.2s, background 0.2s", textAlign: "center", minWidth: "120px" }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(201,168,76,0.35)"; (e.currentTarget as HTMLAnchorElement).style.background = C.cardAlt; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(201,168,76,0.12)"; (e.currentTarget as HTMLAnchorElement).style.background = C.card; }}>
+                    <div style={{ fontFamily: MONO, color: C.gold, fontSize: "16px", marginBottom: "6px", opacity: 0.6 }}>{s.glyph}</div>
+                    <div style={{ color: C.text, fontWeight: 700, fontSize: "12px", fontFamily: FONT, letterSpacing: "0.04em" }}>{s.label}</div>
+                    <div style={{ color: C.mutedH, fontSize: "11px", marginTop: "3px" }}>{s.sub}</div>
                   </a>
                 ))}
               </div>
             </Reveal>
-
-            <div style={{ fontFamily: MONO, color: "rgba(201,168,76,0.12)", fontSize: "11px", letterSpacing: "0.2em", marginTop: "56px", userSelect: "none" }}>
-              ━━━━━━━━━━━━━━━━ ◈ OTTER PROTOCOL · ERC-OTTER · EPOCH I ◈ ━━━━━━━━━━━━━━━━
-            </div>
           </div>
         </section>
 
