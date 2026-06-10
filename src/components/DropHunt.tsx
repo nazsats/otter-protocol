@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { Zap, Clock, Users, ExternalLink, Trophy, AlertTriangle, Check, Search } from "lucide-react";
+import { authFetch } from "@/lib/api";
 
 const C = {
   card: "#111", card2: "#0D0D0D", border: "#1F1F1F", gold: "#C9A84C", goldL: "#E2BF6E",
@@ -54,7 +55,7 @@ function DropCard({ drop, uid, walletAddress }: { drop: Drop; uid?: string; wall
 
     setBusy(true);
     try {
-      const res  = await fetch("/api/drop/redeem", {
+      const res  = await authFetch("/api/drop/redeem", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ code: code.trim(), walletAddress, uid }),

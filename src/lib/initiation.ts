@@ -73,7 +73,7 @@ export type TaskCategory =
   | "GOVERNANCE"
   | "NODE_PRESENCE";
 
-export type TaskAction = "auto" | "link" | "wallet" | "onchain" | "manual" | "quiz" | "node";
+export type TaskAction = "auto" | "link" | "wallet" | "onchain" | "manual" | "quiz" | "node" | "verify_discord" | "verify_telegram";
 
 export interface InitiationTask {
   id:               string;      // human-readable slug
@@ -104,7 +104,7 @@ export const INITIATION_TASKS: InitiationTask[] = [
     category: "SIGNAL_ACQUISITION", difficulty: "initiate",
     title: "Join the Discord Den",
     desc: "Connect to the primary signal channel. The Den is where the protocol breathes.",
-    signal: 100, action: "link", link: "https://discord.gg/EGzu4NHqP",
+    signal: 100, action: "verify_discord", link: "https://discord.gg/EGzu4NHqP",
     requiresApproval: false, repeatable: false, badge: "◆",
   },
   {
@@ -112,7 +112,7 @@ export const INITIATION_TASKS: InitiationTask[] = [
     category: "SIGNAL_ACQUISITION", difficulty: "initiate",
     title: "Join Telegram Channel",
     desc: "Tune to Frequency 02. Secondary signal source for protocol broadcasts.",
-    signal: 100, action: "link", link: "https://t.me/otterprotocol",
+    signal: 100, action: "verify_telegram", link: "https://t.me/otterprotocol",
     requiresApproval: false, repeatable: false, badge: "◈",
   },
   {

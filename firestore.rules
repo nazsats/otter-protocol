@@ -60,15 +60,26 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
-    // Activity feed: public read, auth users can create (task completions, joins)
+    // Activity feed: public read. Clients may ONLY create their own "join"
+    // entries (used by createUserProfile). Value-bearing events (claims, drops,
+    // meme rewards) are written server-side via the Admin SDK so a user can't
+    // forge a fake "claimed 10000 OTTER" line into the public feed.
     match /activity/{entryId} {
       allow read:   if true;
-      allow create: if request.auth != null;
+      allow create: if request.auth != null
+                      && request.resource.data.type == 'join'
+                      && !('amount' in request.resource.data)
+                      && !('txHash' in request.resource.data);
       allow update, delete: if false;
     }
 
     // Rate limiting: server only
     match /rate_limits/{key} {
+      allow read, write: if false;
+    }
+
+    // Treasury nonce lock: server only (Admin SDK)
+    match /treasury_state/{address} {
       allow read, write: if false;
     }
 

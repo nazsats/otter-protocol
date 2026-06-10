@@ -2,13 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { ethers } from "ethers";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { verifyUserMatches, AuthError } from "@/lib/auth-verify";
+import { isAllowedImageUrl } from "@/lib/validate";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
     if (!body) return err("Invalid request", 400);
 
-    const { memeId, contentHash, title, imageUrl, creator, uid, epoch, txHash } =
+    const uid = await verifyUserMatches(req.headers.get("Authorization"), body.uid);
+
+    const { memeId, contentHash, title, imageUrl, creator, epoch, txHash } =
       body as Record<string, unknown>;
 
     if (
@@ -17,14 +22,24 @@ export async function POST(req: NextRequest) {
       typeof title !== "string" ||
       typeof imageUrl !== "string" ||
       typeof creator !== "string" ||
-      typeof uid !== "string" ||
       typeof txHash !== "string"
     ) return err("Missing fields", 400);
 
     if (!ethers.isAddress(creator)) return err("Invalid creator address", 400);
     if (title.length > 100 || title.length < 1) return err("Invalid title", 400);
-    // Basic URL validation — allow http/https only
-    if (!/^https?:\/\/.+/.test(imageUrl)) return err("Invalid image URL (must be http/https)", 400);
+    if (memeId.length > 128 || contentHash.length > 128 || txHash.length > 80)
+      return err("Invalid field length", 400);
+    // Only allow image URLs from trusted hosts (blocks SSRF / javascript: / data: / internal IPs)
+    if (!isAllowedImageUrl(imageUrl)) return err("Image URL must be on an allowed host (ipfs/imgur/etc.)", 400);
+
+    // Rate limit submissions — 10/hr per user, 20/hr per IP
+    const ip = getClientIp(req);
+    const [userRL, ipRL] = await Promise.all([
+      checkRateLimit(`memesubmit:uid:${uid}`, 10, 3600),
+      checkRateLimit(`memesubmit:ip:${ip}`,   20, 3600),
+    ]);
+    if (!userRL.allowed) return err(`Rate limit: retry in ${userRL.resetInSeconds}s`, 429);
+    if (!ipRL.allowed)   return err(`Rate limit: retry in ${ipRL.resetInSeconds}s`, 429);
 
     const db = getAdminDb();
 
@@ -69,6 +84,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, memeId });
   } catch (e: unknown) {
+    if (e instanceof AuthError) return err(e.message, e.status);
     const msg = e instanceof Error ? e.message : "Internal error";
     console.error("[meme/submit]", msg);
     return err("Internal error", 500);

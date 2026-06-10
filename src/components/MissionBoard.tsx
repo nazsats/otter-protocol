@@ -5,6 +5,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { MISSIONS, CATEGORY_META, getUserMissions, completeMission, calcProgress, MissionCategory } from "@/lib/missions";
 import { useToast } from "@/context/ToastContext";
+import { authFetch } from "@/lib/api";
 
 const C = {
   bg:     "#000",
@@ -93,7 +94,7 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
     if (claimed[missionId]) return;
     setClaimingOtter(missionId);
     try {
-      const res  = await fetch("/api/claim-mission", {
+      const res  = await authFetch("/api/claim-mission", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ uid, missionId, walletAddress }),
@@ -124,7 +125,7 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
     if (!walletAddress) { toast("Connect wallet to claim OTTER tokens", "error"); return; }
     setClaimAllBusy(true);
     try {
-      const res  = await fetch("/api/claim-all", {
+      const res  = await authFetch("/api/claim-all", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ uid, walletAddress }),

@@ -4,21 +4,24 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { treasuryTransfer } from "@/lib/chain";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { verifyUserMatches, AuthError } from "@/lib/auth-verify";
 import { MISSIONS } from "@/lib/missions";
 
 const CONTRACT = process.env.NEXT_PUBLIC_OTTER_CONTRACT!;
 
 export async function POST(req: NextRequest) {
   try {
-    // ── 1. Parse + basic validation ──────────────────────
+    // ── 0. Verify identity from Firebase ID token (not the body) ──
     const body = await req.json().catch(() => null);
     if (!body) return err("Invalid request", 400);
+    const uid = await verifyUserMatches(req.headers.get("Authorization"), body.uid);
 
-    const { uid, missionId, walletAddress } = body as Record<string, unknown>;
-    if (typeof uid !== "string" || typeof missionId !== "string" || typeof walletAddress !== "string")
+    // ── 1. Basic validation ──────────────────────────────
+    const { missionId, walletAddress } = body as Record<string, unknown>;
+    if (typeof missionId !== "string" || typeof walletAddress !== "string")
       return err("Missing or invalid fields", 400);
     if (!ethers.isAddress(walletAddress)) return err("Invalid wallet address", 400);
-    if (uid.length > 128 || missionId.length > 64) return err("Invalid field length", 400);
+    if (missionId.length > 64) return err("Invalid field length", 400);
 
     // ── 2. Rate limiting — per user + per IP ─────────────
     const ip         = getClientIp(req);
@@ -128,6 +131,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (e: unknown) {
+    if (e instanceof AuthError) return err(e.message, e.status);
     const msg = e instanceof Error ? e.message : "Internal error";
     // Never expose stack traces or private details to client
     if (msg.includes("User not found"))         return err("User not found", 404);

@@ -22,6 +22,14 @@ const C = {
 };
 const MONO = "'JetBrains Mono','Fira Code','Courier New',monospace";
 
+// ─── 4-stage path preview ─────────────────────────────────────────────────────
+const PATH_STAGES = [
+  { num: "I",   label: "CRACK THE GATE",     desc: "Three fragments. Three platforms. One password.",           icon: "◈" },
+  { num: "II",  label: "CLAIM THE SIGIL",    desc: "Link your wallet. Mint your mark. It costs nothing.",       icon: "◆" },
+  { num: "III", label: "FIRST CONTRIBUTION", desc: "Vote on three memes, or submit your own.",                  icon: "▲" },
+  { num: "IV",  label: "RECRUIT ONE OTTER",  desc: "Bring one through the gate. Initiation complete.",          icon: "⟳" },
+];
+
 // ─── Boot sequence lines ──────────────────────────────────────────────────────
 const BOOT: string[] = [
   "> OTTER.PROTOCOL v0.1 — CIPHER GATE",
@@ -174,6 +182,10 @@ export default function GatePage() {
       });
       if (res.ok) {
         setStatus("success");
+        // Mark Stage I (gate) complete for the Initiation Path
+        if (typeof window !== "undefined") {
+          localStorage.setItem("otter_gate_passed", "true");
+        }
         setTimeout(() => router.push("/about"), 1400);
       } else {
         handleError();
@@ -300,7 +312,7 @@ export default function GatePage() {
               ● {nodeCount} NODES
             </span>
             <span style={{ color:C.mutedH }}>LAST: {lastAccess}</span>
-            <span style={{ color:C.gold, opacity:0.7 }}>v0.1</span>
+            <span style={{ color:C.gold, opacity:0.7 }}>◈ 0 INITIATED</span>
           </div>
         </div>
 
@@ -414,7 +426,7 @@ export default function GatePage() {
             ◈ NO CODE? JOIN THE WAITLIST
           </div>
           <div style={{ fontSize:"10px", color:"#555", letterSpacing:"0.05em", lineHeight:1.7, marginBottom:"14px" }}>
-            Codes are distributed across our socials. Join the waitlist and we&apos;ll send you one when a slot opens.
+            Early access codes are hidden in our social channels. Not found one yet? Drop your email — we&apos;ll notify you when a slot opens.
           </div>
           {waitStatus === "done" ? (
             <div style={{ fontSize:"11px", color:C.green, letterSpacing:"0.1em", padding:"10px 0" }}>
@@ -694,6 +706,41 @@ export default function GatePage() {
             <span style={{ color:C.gold, opacity:0.6 }}>
               SEASON I OPEN
             </span>
+          </div>
+        </div>
+
+        {/* ── WHAT AWAITS ── */}
+        <div style={{ marginBottom:"28px" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"16px" }}>
+            <div style={{ flex:1, height:"1px", background:C.muted }} />
+            <div style={{ fontSize:"8px", letterSpacing:"0.24em", color:C.mutedH }}>
+              ◈ WHAT AWAITS INSIDE
+            </div>
+            <div style={{ flex:1, height:"1px", background:C.muted }} />
+          </div>
+
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px" }}>
+            {PATH_STAGES.map((stage, i) => (
+              <div key={i} style={{
+                background:"#030303",
+                border:`1px solid ${C.muted}`,
+                borderRadius:"6px",
+                padding:"12px 14px",
+              }}>
+                <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"6px" }}>
+                  <span style={{ fontSize:"10px", color:C.gold, fontFamily:MONO }}>{stage.icon}</span>
+                  <span style={{ fontSize:"7px", letterSpacing:"0.2em", color:C.mutedH }}>
+                    STAGE {stage.num}
+                  </span>
+                </div>
+                <div style={{ fontSize:"8px", fontWeight:700, letterSpacing:"0.12em", color:"#777", marginBottom:"4px" }}>
+                  {stage.label}
+                </div>
+                <div style={{ fontSize:"8px", color:"#3A3A3A", lineHeight:"1.6", letterSpacing:"0.03em" }}>
+                  {stage.desc}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

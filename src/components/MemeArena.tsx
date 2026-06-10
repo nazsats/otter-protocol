@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ethers } from "ethers";
 import { useToast } from "@/context/ToastContext";
+import { authFetch } from "@/lib/api";
 import {
   Flame, ThumbsUp, ThumbsDown, Trophy, Clock, Image as ImageIcon,
   Send, RefreshCw, ExternalLink, Zap, AlertTriangle, Lock,
@@ -161,7 +162,7 @@ export default function MemeArena({
       }
 
       // 4. Record in Firestore via API
-      const res = await fetch("/api/meme/submit", {
+      const res = await authFetch("/api/meme/submit", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
@@ -204,7 +205,7 @@ export default function MemeArena({
       await tx.wait();
 
       // Record in Firestore
-      await fetch("/api/meme/vote", {
+      await authFetch("/api/meme/vote", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ memeId, voter: walletAddress, upvote, txHash: tx.hash, uid }),

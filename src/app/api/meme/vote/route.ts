@@ -3,23 +3,26 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { ethers } from "ethers";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { verifyUserMatches, AuthError } from "@/lib/auth-verify";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null);
     if (!body) return err("Invalid request", 400);
 
-    const { memeId, voter, upvote, txHash, uid } = body as Record<string, unknown>;
+    const uid = await verifyUserMatches(req.headers.get("Authorization"), body.uid);
+
+    const { memeId, voter, upvote, txHash } = body as Record<string, unknown>;
 
     if (
       typeof memeId !== "string" ||
       typeof voter !== "string" ||
       typeof upvote !== "boolean" ||
-      typeof txHash !== "string" ||
-      typeof uid !== "string"
+      typeof txHash !== "string"
     ) return err("Missing fields", 400);
 
     if (!ethers.isAddress(voter)) return err("Invalid voter address", 400);
+    if (memeId.length > 128 || txHash.length > 80) return err("Invalid field length", 400);
 
     // Rate limiting
     const ip = getClientIp(req);
@@ -68,6 +71,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, voteId });
   } catch (e: unknown) {
+    if (e instanceof AuthError) return err(e.message, e.status);
     const msg = e instanceof Error ? e.message : "Internal error";
     if (msg.includes("Meme not found")) return err("Meme not found", 404);
     console.error("[meme/vote]", msg);

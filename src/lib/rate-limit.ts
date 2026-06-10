@@ -3,7 +3,14 @@
  * No Redis required. Works on Vercel serverless.
  */
 import { getAdminDb } from "./firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
+
+// `expireAt` is a real Timestamp so a Firestore TTL policy on the
+// `rate_limits` collection (field: expireAt) can auto-delete stale counters.
+// Keep a small buffer past the window so an in-flight window isn't purged early.
+function ttl(windowSec: number): Timestamp {
+  return Timestamp.fromMillis(Date.now() + (windowSec + 60) * 1000);
+}
 
 interface RateLimitResult {
   allowed: boolean;
@@ -35,7 +42,7 @@ export async function checkRateLimit(
       const snap = await tx.get(docRef);
 
       if (!snap.exists) {
-        tx.set(docRef, { count: 1, resetAt: windowEnd });
+        tx.set(docRef, { count: 1, resetAt: windowEnd, expireAt: ttl(windowSec) });
         return { count: 1, resetAt: windowEnd };
       }
 
@@ -45,7 +52,7 @@ export async function checkRateLimit(
 
       if (expired) {
         // Window expired — reset
-        tx.set(docRef, { count: 1, resetAt: windowEnd });
+        tx.set(docRef, { count: 1, resetAt: windowEnd, expireAt: ttl(windowSec) });
         return { count: 1, resetAt: windowEnd };
       }
 

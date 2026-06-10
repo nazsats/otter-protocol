@@ -43,6 +43,14 @@ async function main() {
   const initiationAddress = await initiation.getAddress();
   console.log("✓ OTTERInitiation:", initiationAddress);
 
+  // ── 3. Deploy OTTERSigil (soulbound initiation badge) ────────────────────
+  console.log("Deploying OTTERSigil…");
+  const OTTERSigil = await ethers.getContractFactory("OTTERSigil");
+  const sigil      = await OTTERSigil.deploy();
+  await sigil.waitForDeployment();
+  const sigilAddress = await sigil.getAddress();
+  console.log("✓ OTTERSigil     :", sigilAddress);
+
   // ── Summary ───────────────────────────────────────────────────────────────
   const supply = ethers.formatEther(await token.totalSupply());
   console.log("");
@@ -54,19 +62,18 @@ async function main() {
   console.log("══ Copy these into your .env.local ════════════════════");
   console.log(`NEXT_PUBLIC_OTTER_CONTRACT=${tokenAddress}`);
   console.log(`NEXT_PUBLIC_INITIATION_CONTRACT=${initiationAddress}`);
+  console.log(`NEXT_PUBLIC_SIGIL_CONTRACT=${sigilAddress}`);
   console.log("");
-  console.log("══ Also update in Vercel env vars ═════════════════════");
+  console.log("══ Also set in Vercel env vars ═════════════════════════");
   console.log(`NEXT_PUBLIC_OTTER_CONTRACT=${tokenAddress}`);
   console.log(`NEXT_PUBLIC_INITIATION_CONTRACT=${initiationAddress}`);
-  console.log("  OR set them in /admin → ⚙ CONFIG → Contract Addresses");
-  console.log("");
-  console.log("══ Verify on Etherscan (run after deploy) ══════════════");
-  console.log(`npx hardhat verify --network sepolia ${tokenAddress} "${TREASURY_ADDRESS}" "${LIQUIDITY_LOCK_ADDRESS}"`);
-  console.log(`npx hardhat verify --network sepolia ${initiationAddress} "${GUARDIAN_ADDRESS}"`);
+  console.log(`NEXT_PUBLIC_SIGIL_CONTRACT=${sigilAddress}`);
+  console.log("  OR set contract addresses in /admin → ⚙ CONFIG");
   console.log("");
   console.log("══ View on Etherscan ════════════════════════════════════");
   console.log(`https://sepolia.etherscan.io/address/${tokenAddress}`);
   console.log(`https://sepolia.etherscan.io/address/${initiationAddress}`);
+  console.log(`https://sepolia.etherscan.io/address/${sigilAddress}`);
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });

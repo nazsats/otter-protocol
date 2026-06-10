@@ -4,6 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { treasuryTransfer } from "@/lib/chain";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { verifyUserMatches, AuthError } from "@/lib/auth-verify";
 import { MISSIONS } from "@/lib/missions";
 
 const CONTRACT = process.env.NEXT_PUBLIC_OTTER_CONTRACT!;
@@ -13,8 +14,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 
-    const { uid, walletAddress } = body as Record<string, unknown>;
-    if (typeof uid !== "string" || typeof walletAddress !== "string")
+    const uid = await verifyUserMatches(req.headers.get("Authorization"), body.uid);
+
+    const { walletAddress } = body as Record<string, unknown>;
+    if (typeof walletAddress !== "string")
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     if (!ethers.isAddress(walletAddress))
       return NextResponse.json({ error: "Invalid wallet" }, { status: 400 });
@@ -109,7 +112,8 @@ export async function POST(req: NextRequest) {
     const totalOtter = results.reduce((s, r) => s + r.amount, 0);
     return NextResponse.json({ success: true, claimed: results, totalOtter });
 
-  } catch {
+  } catch (e: unknown) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: e.status });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

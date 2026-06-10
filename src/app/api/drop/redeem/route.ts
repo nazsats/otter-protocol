@@ -15,6 +15,7 @@ import { FieldValue }                 from "firebase-admin/firestore";
 import { getAdminDb }                 from "@/lib/firebase-admin";
 import { treasuryTransfer }           from "@/lib/chain";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { verifyUserMatches, AuthError } from "@/lib/auth-verify";
 
 const CONTRACT = process.env.NEXT_PUBLIC_OTTER_CONTRACT!;
 
@@ -23,10 +24,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     if (!body) return err("Invalid request", 400);
 
-    const { code, walletAddress, uid } = body as Record<string, unknown>;
+    const uid = await verifyUserMatches(req.headers.get("Authorization"), body.uid);
+
+    const { code, walletAddress } = body as Record<string, unknown>;
     if (typeof code          !== "string") return err("Code required", 400);
     if (typeof walletAddress !== "string") return err("Wallet required", 400);
-    if (typeof uid           !== "string") return err("User ID required", 400);
     if (!ethers.isAddress(walletAddress))  return err("Invalid wallet address", 400);
     if (code.length < 1 || code.length > 64) return err("Invalid code length", 400);
 
@@ -158,6 +160,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (e: unknown) {
+    if (e instanceof AuthError) return err(e.message, e.status);
     const msg = e instanceof Error ? e.message : "Internal error";
     if (msg.includes("Insufficient treasury")) return err("Treasury low", 503);
     if (msg.includes("rejected"))              return err("Transaction rejected", 400);

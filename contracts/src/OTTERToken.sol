@@ -125,10 +125,13 @@ contract OTTERToken is IERC_OTTER {
             uint256 tax = (amount * TAX_RATE_BPS) / 10_000;
             uint256 net = amount - tax;
 
-            _distributeTax(from, tax);
-
+            // Debit the sender ONCE for the full amount, then credit the
+            // recipient the net and distribute the tax. (Previously the sender
+            // was debited both here AND inside _distributeTax — a double-debit.)
             _balances[from] -= amount;
             _balances[to]   += net;
+
+            _distributeTax(from, tax);
 
             // Reset hold timer on sell
             if (to == liquidityLock || _isPool(to)) {
@@ -148,20 +151,25 @@ contract OTTERToken is IERC_OTTER {
         }
     }
 
+    /// @dev The caller (_transfer) has ALREADY debited `from` by the full
+    ///      amount, so this function only credits the tax destinations — it must
+    ///      not touch `from`'s balance again.
     function _distributeTax(address from, uint256 tax) internal {
         uint256 toTreasury  = (tax * _TREASURY_SHARE)  / 10_000;
         uint256 toRewards   = (tax * _REWARDS_SHARE)   / 10_000;
         uint256 toLiquidity = (tax * _LIQUIDITY_SHARE) / 10_000;
         uint256 toBurn      = tax - toTreasury - toRewards - toLiquidity;
 
-        _balances[from]       -= tax;
-        _balances[treasury]   += toTreasury;
+        _balances[treasury]      += toTreasury;
         _balances[liquidityLock] += toLiquidity;
-        _rewardsPool           += toRewards;
+        // Rewards tokens are actually held by the contract so claimRewards()
+        // can pay them out (previously they were only counted, never backed).
+        _balances[address(this)] += toRewards;
+        _rewardsPool             += toRewards;
 
-        // Burn
-        _balances[address(0)] += toBurn;
-        totalSupply           -= toBurn;
+        // Burn: reduce total supply only. Do NOT credit address(0) — doing both
+        // broke the invariant (sum of balances must equal totalSupply).
+        totalSupply -= toBurn;
 
         // Update rewards rate
         if (totalSupply > 0) {
@@ -169,9 +177,10 @@ contract OTTERToken is IERC_OTTER {
         }
 
         emit TaxDistributed(toTreasury, toRewards, toLiquidity, toBurn);
-        emit Transfer(from, treasury,              toTreasury);
-        emit Transfer(from, liquidityLock,         toLiquidity);
-        emit Transfer(from, address(0),            toBurn);
+        emit Transfer(from, treasury,        toTreasury);
+        emit Transfer(from, liquidityLock,   toLiquidity);
+        emit Transfer(from, address(this),   toRewards);
+        emit Transfer(from, address(0),      toBurn);
     }
 
     // ─── REWARD ACCOUNTING ────────────────────────────────────────────────
@@ -194,10 +203,17 @@ contract OTTERToken is IERC_OTTER {
         claimed = _pendingRewards[msg.sender];
         if (claimed == 0) revert NothingToClaim();
 
-        _pendingRewards[msg.sender] = 0;
-        _rewardsPool -= claimed;
-        _balances[msg.sender] += claimed;
-        _balances[address(this)] -= claimed;
+        // Never pay out more than the contract actually holds. This caps payouts
+        // to backed tokens and prevents underflow from any rounding drift between
+        // the staking accrual and the epoch-distribution accounting.
+        uint256 available = _balances[address(this)];
+        if (claimed > available) claimed = available;
+        if (claimed == 0) revert NothingToClaim();
+
+        _pendingRewards[msg.sender] -= claimed;
+        _rewardsPool              = _rewardsPool > claimed ? _rewardsPool - claimed : 0;
+        _balances[msg.sender]     += claimed;
+        _balances[address(this)]  -= claimed;
 
         emit RewardsClaimed(msg.sender, claimed);
     }
