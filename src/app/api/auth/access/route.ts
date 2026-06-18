@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { signAccessToken, ACCESS_COOKIE, ACCESS_MAX_AGE_SEC } from "@/lib/access-token";
 
 const FALLBACK_CODE = process.env.ACCESS_CODE;
 
@@ -39,12 +40,12 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ error: "Invalid access code" }, { status: 401 });
 }
 
-function setAccessCookie() {
+async function setAccessCookie() {
   const res = NextResponse.json({ success: true });
-  res.cookies.set("otter_access", "1", {
+  res.cookies.set(ACCESS_COOKIE, await signAccessToken(), {
     httpOnly: true,
     sameSite: "strict",
-    maxAge:   30 * 24 * 60 * 60,
+    maxAge:   ACCESS_MAX_AGE_SEC,
     path:     "/",
     secure:   process.env.NODE_ENV === "production",
   });

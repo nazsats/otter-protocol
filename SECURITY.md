@@ -51,7 +51,19 @@ in the request body, so anyone who knew a victim's uid could act as them.
   nonce and silently drop a transaction.
 - Per-transfer amount cap retained; balance checked before sending.
 
-### 5. OTTERToken.sol accounting bugs fixed
+### 5. Access gate cookie is now unforgeable
+The early-access gate used a static cookie value (`otter_access=1`) — anyone
+could bypass the whole site by setting that cookie by hand. It's now an
+**HMAC-signed token** (`<issuedAt>.<hmac>`, [access-token.ts](src/lib/access-token.ts))
+minted by `/api/auth/access` and verified in [proxy.ts](src/proxy.ts). Forging
+it requires the server secret; tokens also expire after 30 days. Uses Web Crypto
+so the same module runs in both the Node route and the Edge middleware.
+
+> Requires `ACCESS_GATE_SECRET` (or the existing `ADMIN_SECRET`) to be set.
+> After deploy, existing visitors holding the old `otter_access=1` cookie are
+> redirected to the gate to re-enter the code once — expected.
+
+### 6. OTTERToken.sol accounting bugs fixed
 - **Double-debit**: the taxable path debited the sender both in `_transfer` and
   in `_distributeTax` — sender lost `amount + tax`. Now debited once.
 - **Burn invariant**: burn credited `address(0)` *and* reduced `totalSupply`,

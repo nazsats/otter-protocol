@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyAccessToken, ACCESS_COOKIE } from "@/lib/access-token";
 
 // Public paths that bypass the access-code gate
 const PUBLIC_PATHS = new Set(["/", "/api/auth/access", "/admin"]);
@@ -54,7 +55,7 @@ function throttled(ip: string): boolean {
   return rec.count > MAX_HITS;
 }
 
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Always allow internal/static paths
@@ -77,9 +78,10 @@ export function proxy(req: NextRequest) {
   // API routes enforce their own auth/rate-limits; don't gate them on the cookie
   if (pathname.startsWith("/api/")) return NextResponse.next();
 
-  // Check for the access cookie
-  const access = req.cookies.get("otter_access");
-  if (!access || access.value !== "1") {
+  // Verify the signed access token. A forged/static/expired cookie fails the
+  // HMAC check and is redirected to the gate.
+  const access = req.cookies.get(ACCESS_COOKIE);
+  if (!(await verifyAccessToken(access?.value))) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
