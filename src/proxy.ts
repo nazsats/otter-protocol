@@ -3,13 +3,20 @@ import { NextRequest, NextResponse } from "next/server";
 // Public paths that bypass the access-code gate
 const PUBLIC_PATHS = new Set(["/", "/api/auth/access", "/admin"]);
 
-// Paths that are always allowed (static assets, Next.js internals)
+// Paths that are always allowed (static assets, Next.js internals).
+// IMPORTANT: public static files (e.g. /otter-logo.png) must be exempt from the
+// access-code gate — otherwise the gate page's own logo/images get redirected
+// to "/" for visitors who don't have the cookie yet, and the landing page shows
+// no images.
+const STATIC_ASSET_RE = /\.(png|jpe?g|gif|svg|webp|avif|ico|css|js|mjs|map|woff2?|ttf|otf|eot|txt|xml|json|mp4|webm|wasm)$/i;
+
 function isInternalPath(pathname: string): boolean {
   return (
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/robots") ||
-    pathname.startsWith("/sitemap")
+    pathname.startsWith("/sitemap") ||
+    STATIC_ASSET_RE.test(pathname)
   );
 }
 

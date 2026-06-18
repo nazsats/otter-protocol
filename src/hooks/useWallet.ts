@@ -1,9 +1,7 @@
 "use client";
-import { useEffect, useCallback } from "react";
+import { useCallback } from "react";
 import { useAppKit, useAppKitAccount, useAppKitNetwork, useAppKitProvider } from "@reown/appkit/react";
 import { BrowserProvider, JsonRpcSigner, ethers } from "ethers";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 export const SEPOLIA_CHAIN_ID = 11155111;
 
@@ -19,18 +17,10 @@ export function useWallet() {
   const isCorrectNetwork = chainId === SEPOLIA_CHAIN_ID;
   const shortAddress     = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : null;
 
-  // Persist wallet address to Firebase user doc whenever it changes
-  const syncToFirebase = useCallback(async (addr: string) => {
-    try {
-      const uid = localStorage.getItem("otter_uid");
-      if (!uid) return;
-      await setDoc(doc(db, "users", uid), { walletAddress: addr, updatedAt: serverTimestamp() }, { merge: true });
-    } catch { /* silent — user may not be signed in yet */ }
-  }, []);
-
-  useEffect(() => {
-    if (isConnected && address) syncToFirebase(address);
-  }, [isConnected, address, syncToFirebase]);
+  // NOTE: connecting a wallet here no longer writes to Firestore. Binding the
+  // wallet to the account is handled deliberately by useWalletBinding (first
+  // connect auto-binds; changing it is an explicit Profile action) so a freshly
+  // connected wallet can never silently overwrite the user's eligible wallet.
 
   // Get ethers signer for transactions
   const getSigner = useCallback(async (): Promise<JsonRpcSigner | null> => {

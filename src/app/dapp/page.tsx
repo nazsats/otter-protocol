@@ -11,6 +11,7 @@ import MemeArena from "@/components/MemeArena";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { useWallet } from "@/hooks/useWallet";
+import { useWalletBinding } from "@/hooks/useWalletBinding";
 import { autoCompleteMissions, getLeaderboard, calcProgress, getUserMissions } from "@/lib/missions";
 import { getUserInitiation, calcInitiationProgress } from "@/lib/initiation";
 import { doc, getDoc } from "firebase/firestore";
@@ -54,14 +55,21 @@ export default function DAppPage() {
   const { user, profile, openAuthModal } = useAuth();
   const toast  = useToast();
   const wallet = useWallet();
+  const binding = useWalletBinding();
   const [tab, setTab] = useState<Tab>("dashboard");
 
   // Destructure stable primitives to avoid infinite loop in fetchChain
-  const walletAddr       = wallet.address;
+  const walletAddr       = wallet.address;  // live connected address (read-only views)
   const walletCorrectNet = wallet.isCorrectNetwork;
   const walletConnected  = wallet.isConnected;
   const getProvider      = wallet.getProvider;
   const getSigner        = wallet.getSigner;
+
+  // Only the bound + currently-connected wallet is eligible to earn / claim.
+  // This — not the live address — is what we hand to the points components.
+  const eligibleWallet = binding.eligibleWallet;
+  const walletMismatch = binding.isMismatch;
+  const boundWallet    = binding.boundWallet;
 
   // Contract addresses — loaded from Firestore (admin-updatable without redeploy)
   const [CONTRACT_ADDRESS,      setContractAddress]      = useState<string | null>(ENV_OTTER_CONTRACT);
@@ -302,6 +310,29 @@ export default function DAppPage() {
                 </button>
               ))}
             </div>
+
+            {/* ── WRONG WALLET BANNER ── */}
+            {walletMismatch && (
+              <div style={{
+                display: "flex", alignItems: "flex-start", gap: "10px",
+                background: "rgba(245,166,35,0.06)", border: "1px solid rgba(245,166,35,0.3)",
+                borderRadius: "10px", padding: "12px 14px", marginBottom: "16px",
+              }}>
+                <AlertTriangle size={15} color={C.orange} style={{ flexShrink: 0, marginTop: "1px" }} />
+                <div style={{ fontSize: "12px", color: C.text, lineHeight: 1.5 }}>
+                  <strong style={{ color: C.orange }}>Wrong wallet connected.</strong>{" "}
+                  Your account is bound to{" "}
+                  <span style={{ fontFamily: "monospace", color: C.gold }}>
+                    {boundWallet ? `${boundWallet.slice(0, 6)}…${boundWallet.slice(-4)}` : "another wallet"}
+                  </span>.
+                  Only that wallet earns points and claims rewards. Switch back to it in your
+                  wallet, or{" "}
+                  <a href="/profile" style={{ color: C.gold, textDecoration: "underline" }}>
+                    change your bound wallet in Profile
+                  </a>.
+                </div>
+              </div>
+            )}
 
             {/* ════ DASHBOARD ════ */}
             {tab === "dashboard" && (
@@ -577,7 +608,7 @@ export default function DAppPage() {
                 {user
                   ? <MissionBoard
                       uid={user.uid}
-                      walletAddress={walletAddr}
+                      walletAddress={eligibleWallet}
                       referralCount={profile?.referralCount}
                       isOnSepolia={walletCorrectNet}
                       onComplete={refreshPoints}
@@ -598,7 +629,7 @@ export default function DAppPage() {
             {tab === "memes" && (
               <MemeArena
                 uid={user?.uid}
-                walletAddress={walletAddr}
+                walletAddress={eligibleWallet}
                 isConnected={walletConnected}
                 isCorrectNetwork={walletCorrectNet}
                 getProvider={getProvider}
@@ -609,7 +640,7 @@ export default function DAppPage() {
 
             {/* ════ DROP HUNTS ════ */}
             {tab === "drops" && (
-              <DropHunt uid={user?.uid} walletAddress={walletAddr} />
+              <DropHunt uid={user?.uid} walletAddress={eligibleWallet} />
             )}
 
             {/* ════ ON-CHAIN ════ */}

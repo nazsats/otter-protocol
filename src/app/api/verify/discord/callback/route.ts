@@ -63,13 +63,14 @@ export async function GET(req: NextRequest) {
     const tokenData = await tokenRes.json();
     if (!tokenRes.ok || !tokenData.access_token) throw new Error(tokenData.error_description || "Token exchange failed");
     accessToken = tokenData.access_token as string;
-  } catch (e) {
+  } catch {
     return fail("Token exchange failed — try again");
   }
 
   // ── 3. Fetch user's guilds and check membership ────────────────────────────
   let isMember = false;
   let discordUsername = "";
+  let discordId = "";
   try {
     const [userRes, guildsRes] = await Promise.all([
       fetch("https://discord.com/api/users/@me",         { headers: { Authorization: `Bearer ${accessToken}` } }),
@@ -77,6 +78,7 @@ export async function GET(req: NextRequest) {
     ]);
     const [userData, guildsData] = await Promise.all([userRes.json(), guildsRes.json()]);
 
+    discordId       = String(userData.id || "");
     discordUsername = userData.username ? `${userData.username}#${userData.discriminator || "0"}` : userData.global_name || "";
 
     if (Array.isArray(guildsData)) {
@@ -91,13 +93,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(inviteUrl);
   }
 
-  // ── 4. Mark verified in Firestore (idempotent) ────────────────────────────
+  // ── 4. Bind identity + mark verified ──────────────────────────────────────
   const db = getAdminDb();
+  const userRef       = db.collection("users").doc(uid);
   const initiationRef = db.collection("user_initiation").doc(uid);
-  const snap = await initiationRef.get();
+  const [iniSnap, userSnap] = await Promise.all([initiationRef.get(), userRef.get()]);
 
-  if (!snap.exists || !snap.data()?.[TASK_ID]) {
-    const batch = db.batch();
+  // Lock: this OTTER account is already bound to a DIFFERENT Discord account.
+  const boundDiscordId = userSnap.data()?.discordId as string | undefined;
+  if (boundDiscordId && discordId && boundDiscordId !== discordId) {
+    return fail("Your account is already linked to a different Discord. Unlink it in Profile first.");
+  }
+
+  const alreadyDone = iniSnap.exists && !!iniSnap.data()?.[TASK_ID];
+  const batch = db.batch();
+
+  // Always (re)bind the identity so a re-link after unlink works.
+  batch.set(userRef, {
+    discordVerified: true,
+    discordUsername,
+    discordId,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  // Award signal only the first time the task is completed.
+  if (!alreadyDone) {
     batch.set(initiationRef, {
       [TASK_ID]: {
         taskId:    TASK_ID,
@@ -109,13 +129,7 @@ export async function GET(req: NextRequest) {
         discordUsername,
       },
     }, { merge: true });
-    batch.set(db.collection("users").doc(uid), {
-      signalWeight:     FieldValue.increment(SIGNAL),
-      discordVerified:  true,
-      discordUsername,
-      updatedAt:        FieldValue.serverTimestamp(),
-    }, { merge: true });
-    // Activity log
+    batch.set(userRef, { signalWeight: FieldValue.increment(SIGNAL) }, { merge: true });
     batch.set(db.collection("activity").doc(`verify_discord_${uid}`), {
       type:      "initiation",
       uid,
@@ -123,8 +137,8 @@ export async function GET(req: NextRequest) {
       signal:    SIGNAL,
       timestamp: FieldValue.serverTimestamp(),
     });
-    await batch.commit();
   }
+  await batch.commit();
 
   // ── 5. Redirect back with success ────────────────────────────────────────
   const success = new URL(`${APP_URL}/dapp`);

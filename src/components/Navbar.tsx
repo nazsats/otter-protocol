@@ -22,7 +22,7 @@ export default function Navbar() {
   const [dropdown, setDropdown]       = useState(false);
   const [copiedRef, setCopiedRef]     = useState(false);
   const dropdownRef                   = useRef<HTMLDivElement>(null);
-  const { user, profile, openAuthModal, logout, connectWallet } = useAuth();
+  const { user, profile, openAuthModal, logout, bindWallet } = useAuth();
   const toast = useToast();
 
   // Close dropdown on outside click
@@ -59,8 +59,18 @@ export default function Navbar() {
     try {
       const addr = await connectInjectedWallet();
       if (addr) {
-        await connectWallet(addr);
-        toast(`Wallet connected: ${shortAddress(addr)}`, "success");
+        const result = await bindWallet(addr);
+        if (result === "bound") {
+          toast(`Wallet bound to your account: ${shortAddress(addr)}`, "success");
+        } else if (result === "already") {
+          toast("Wallet already linked to your account", "info");
+        } else {
+          // A different wallet than the one bound — never overwritten silently.
+          toast(
+            `Wrong wallet. Your account is bound to ${profile?.walletAddress ? shortAddress(profile.walletAddress) : "another wallet"}. Change it in Profile.`,
+            "error"
+          );
+        }
       }
     } catch {
       toast("Failed to connect wallet", "error");

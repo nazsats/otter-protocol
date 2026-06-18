@@ -46,7 +46,11 @@ interface AuthContextType {
     referralCode?: string
   ) => Promise<void>;
   logout: () => Promise<void>;
-  connectWallet: (address: string) => Promise<void>;
+  /** Bind a wallet to the account. First connect only — never overwrites an
+   *  existing binding (use changeWallet for that). Returns the resulting state. */
+  bindWallet: (address: string) => Promise<"bound" | "already" | "mismatch">;
+  /** Explicitly rebind the account to a new wallet (Profile → Change wallet). */
+  changeWallet: (address: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -144,7 +148,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   };
 
-  const connectWallet = async (address: string) => {
+  // First-time bind only. If a wallet is already bound, this NEVER silently
+  // overwrites it — a different wallet is reported as "mismatch" so the UI can
+  // tell the user they connected the wrong wallet.
+  const bindWallet = async (address: string): Promise<"bound" | "already" | "mismatch"> => {
+    if (!user) return "mismatch";
+    const current = profile?.walletAddress;
+    if (current) {
+      return current.toLowerCase() === address.toLowerCase() ? "already" : "mismatch";
+    }
+    await linkWallet(user.uid, address);
+    await refreshProfile();
+    return "bound";
+  };
+
+  // Explicit rebind (Profile → Change wallet). Overwrites the binding.
+  const changeWallet = async (address: string) => {
     if (!user) return;
     await linkWallet(user.uid, address);
     await refreshProfile();
@@ -164,7 +183,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithEmail,
         signUpWithEmail,
         logout,
-        connectWallet,
+        bindWallet,
+        changeWallet,
         refreshProfile,
       }}
     >

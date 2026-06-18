@@ -75,14 +75,36 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── 4. Mark verified in Firestore (idempotent) ────────────────────────
+    // ── 4. Bind identity + mark verified ──────────────────────────────────
     const db = getAdminDb();
+    const userRef       = db.collection("users").doc(uid);
     const initiationRef = db.collection("user_initiation").doc(uid);
-    const snap = await initiationRef.get();
+    const [iniSnap, userSnap] = await Promise.all([initiationRef.get(), userRef.get()]);
 
-    if (!snap.exists || !snap.data()?.[TASK_ID]) {
-      const tgUsername = tgData.username || `${tgData.first_name}${tgData.last_name ? " " + tgData.last_name : ""}`;
-      const batch = db.batch();
+    const tgUserId   = String(tgData.id);
+    const tgUsername = tgData.username || `${tgData.first_name}${tgData.last_name ? " " + tgData.last_name : ""}`;
+
+    // Lock: this OTTER account is already bound to a DIFFERENT Telegram account.
+    const boundTgId = userSnap.data()?.telegramId as string | undefined;
+    if (boundTgId && boundTgId !== tgUserId) {
+      return NextResponse.json({
+        error: "Your account is already linked to a different Telegram. Unlink it in Profile first.",
+      }, { status: 409 });
+    }
+
+    const alreadyDone = iniSnap.exists && !!iniSnap.data()?.[TASK_ID];
+    const batch = db.batch();
+
+    // Always (re)bind identity so a re-link after unlink works.
+    batch.set(userRef, {
+      telegramVerified: true,
+      telegramUsername: tgUsername,
+      telegramId:       tgUserId,
+      updatedAt:        FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    // Award signal only the first time.
+    if (!alreadyDone) {
       batch.set(initiationRef, {
         [TASK_ID]: {
           taskId:      TASK_ID,
@@ -91,16 +113,11 @@ export async function POST(req: NextRequest) {
           timestamp:   Date.now(),
           approved:    true,
           method:      "telegram_widget",
-          tgUserId:    tgData.id,
+          tgUserId,
           tgUsername,
         },
       }, { merge: true });
-      batch.set(db.collection("users").doc(uid), {
-        signalWeight:       FieldValue.increment(SIGNAL),
-        telegramVerified:   true,
-        telegramUsername:   tgUsername,
-        updatedAt:          FieldValue.serverTimestamp(),
-      }, { merge: true });
+      batch.set(userRef, { signalWeight: FieldValue.increment(SIGNAL) }, { merge: true });
       batch.set(db.collection("activity").doc(`verify_telegram_${uid}`), {
         type:      "initiation",
         uid,
@@ -108,8 +125,8 @@ export async function POST(req: NextRequest) {
         signal:    SIGNAL,
         timestamp: FieldValue.serverTimestamp(),
       });
-      await batch.commit();
     }
+    await batch.commit();
 
     return NextResponse.json({ success: true, signal: SIGNAL });
 

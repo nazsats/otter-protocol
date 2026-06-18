@@ -128,7 +128,7 @@ function ConnectBadge({ connected, label }: { connected: boolean; label: string 
 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 export default function ProfilePage() {
-  const { user, profile, logout, refreshProfile, openAuthModal } = useAuth();
+  const { user, profile, logout, refreshProfile, openAuthModal, bindWallet, changeWallet } = useAuth();
   const toast  = useToast();
   const wallet = useWallet();
   const router = useRouter();
@@ -148,9 +148,34 @@ export default function ProfilePage() {
   const [extra, setExtra] = useState<{
     discordHandle?: string;
     telegramHandle?: string;
+    discordVerified?: boolean;
+    discordUsername?: string;
+    discordId?: string;
+    telegramVerified?: boolean;
+    telegramUsername?: string;
+    telegramId?: string;
     signalWeight?: number;
     createdAt?: number | { seconds: number };
   } | null>(null);
+
+  // Unlink a verified social so a different account can be re-verified.
+  // Does NOT refund signal — the task stays completed.
+  const [unlinkBusy, setUnlinkBusy] = useState<"discord" | "telegram" | null>(null);
+  const unlinkSocial = async (which: "discord" | "telegram") => {
+    if (!user) return;
+    setUnlinkBusy(which);
+    try {
+      const clear = which === "discord"
+        ? { discordVerified: false, discordUsername: null, discordId: null }
+        : { telegramVerified: false, telegramUsername: null, telegramId: null };
+      await setDoc(doc(db, "users", user.uid), { ...clear, updatedAt: serverTimestamp() }, { merge: true });
+      await loadExtra();
+      toast(`${which === "discord" ? "Discord" : "Telegram"} unlinked — you can link a different account now`, "success");
+    } catch {
+      toast("Failed to unlink", "error");
+    }
+    setUnlinkBusy(null);
+  };
 
   // Stats
   const [initiationDone, setInitiationDone] = useState(0);
@@ -265,21 +290,48 @@ export default function ProfilePage() {
     }
   };
 
-  // ── Connect wallet ──
-  const handleConnectWallet = async () => {
-    if (!wallet.isConnected) {
-      toast("Open wallet from the navbar first", "info");
+  // ── Wallet binding ──
+  // Confirmation gate for changing an already-bound wallet (destructive: the old
+  // wallet stops being the eligible one).
+  const [confirmChange, setConfirmChange] = useState(false);
+  const [walletBusy,    setWalletBusy]    = useState(false);
+
+  // Bind the connected wallet for the first time (no wallet bound yet).
+  const handleBindWallet = async () => {
+    if (!wallet.isConnected || !wallet.address) {
+      toast("Open your wallet from the navbar and connect first", "info");
       return;
     }
-    if (!user || !wallet.address) return;
+    if (!user) return;
+    setWalletBusy(true);
     try {
-      await updateDoc(doc(db, "users", user.uid), { walletAddress: wallet.address });
-      await refreshProfile();
-      await loadExtra();
-      toast("Wallet linked to profile", "success");
+      const result = await bindWallet(wallet.address);
+      if (result === "bound")   { await loadExtra(); toast("Wallet bound to your account", "success"); }
+      else if (result === "already") toast("This wallet is already your bound wallet", "info");
+      else toast("A different wallet is already bound — use Change wallet", "error");
     } catch {
-      toast("Failed to link wallet", "error");
+      toast("Failed to bind wallet", "error");
     }
+    setWalletBusy(false);
+  };
+
+  // Explicitly rebind to the currently-connected wallet (after confirm).
+  const handleChangeWallet = async () => {
+    if (!wallet.isConnected || !wallet.address) {
+      toast("Connect the new wallet first", "info");
+      return;
+    }
+    if (!user) return;
+    setWalletBusy(true);
+    try {
+      await changeWallet(wallet.address);
+      await loadExtra();
+      toast("Bound wallet changed", "success");
+      setConfirmChange(false);
+    } catch {
+      toast("Failed to change wallet", "error");
+    }
+    setWalletBusy(false);
   };
 
   if (loading) {
@@ -292,8 +344,11 @@ export default function ProfilePage() {
 
   if (!user) return null;
 
-  const walletAddr = profile?.walletAddress || extra?.discordHandle;
   const savedWallet = (profile as { walletAddress?: string })?.walletAddress;
+  // Wallet binding state for the UI.
+  const activeWallet    = wallet.address ?? null;
+  const walletMatches   = !!savedWallet && !!activeWallet && savedWallet.toLowerCase() === activeWallet.toLowerCase();
+  const walletMismatch  = !!savedWallet && !!activeWallet && !walletMatches;
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text }}>
@@ -517,10 +572,16 @@ export default function ProfilePage() {
 
             {/* ── WALLET ── */}
             <Card>
-              <CardHeader glyph="⬡" title="WALLET" action={
-                <button onClick={handleConnectWallet} style={{ fontFamily: MONO, fontSize: "8px", color: C.gold, background: "transparent", border: `1px solid rgba(201,168,76,0.3)`, borderRadius: "4px", padding: "4px 10px", cursor: "pointer", letterSpacing: "0.1em" }}>
-                  {savedWallet ? "UPDATE" : "LINK WALLET"}
-                </button>
+              <CardHeader glyph="⬡" title="ELIGIBLE WALLET" action={
+                !savedWallet ? (
+                  <button onClick={handleBindWallet} disabled={walletBusy} style={{ fontFamily: MONO, fontSize: "8px", color: C.gold, background: "transparent", border: `1px solid rgba(201,168,76,0.3)`, borderRadius: "4px", padding: "4px 10px", cursor: walletBusy ? "wait" : "pointer", letterSpacing: "0.1em" }}>
+                    {walletBusy ? "…" : "LINK WALLET"}
+                  </button>
+                ) : walletMismatch ? (
+                  <button onClick={() => setConfirmChange(true)} style={{ fontFamily: MONO, fontSize: "8px", color: C.amber, background: "transparent", border: `1px solid rgba(245,166,35,0.4)`, borderRadius: "4px", padding: "4px 10px", cursor: "pointer", letterSpacing: "0.1em" }}>
+                    CHANGE WALLET
+                  </button>
+                ) : null
               } />
 
               <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
@@ -529,9 +590,9 @@ export default function ProfilePage() {
                     <Wallet size={15} color={savedWallet ? C.gold : C.mutedL} />
                   </div>
                   <div>
-                    <div style={{ fontFamily: FONT, fontSize: "12px", color: C.text, fontWeight: 700, letterSpacing: "0.04em" }}>EVM Wallet</div>
+                    <div style={{ fontFamily: FONT, fontSize: "12px", color: C.text, fontWeight: 700, letterSpacing: "0.04em" }}>Bound EVM Wallet</div>
                     <div style={{ fontFamily: MONO, fontSize: "9px", color: savedWallet ? C.gold : C.mutedL, marginTop: "2px" }}>
-                      {savedWallet ? shortAddr(savedWallet) : "Not linked"}
+                      {savedWallet ? shortAddr(savedWallet) : "Not linked — connect a wallet to bind it"}
                     </div>
                   </div>
                 </div>
@@ -542,15 +603,47 @@ export default function ProfilePage() {
                       <ExternalLink size={11} />
                     </a>
                   )}
-                  <ConnectBadge connected={!!savedWallet} label="NOT LINKED" />
+                  <ConnectBadge connected={walletMatches} label={savedWallet ? "NOT ACTIVE" : "NOT LINKED"} />
                 </div>
               </div>
 
-              {wallet.isConnected && wallet.address && wallet.address !== savedWallet && (
-                <div style={{ padding: "12px 20px", background: "rgba(245,166,35,0.04)", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: "8px" }}>
-                  <AlertTriangle size={12} color={C.amber} />
-                  <span style={{ fontFamily: MONO, fontSize: "9px", color: C.amber, letterSpacing: "0.06em" }}>
-                    Active wallet {shortAddr(wallet.address)} not linked — click UPDATE to save
+              {/* Wrong wallet connected */}
+              {walletMismatch && !confirmChange && (
+                <div style={{ padding: "12px 20px", background: "rgba(245,166,35,0.05)", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                  <AlertTriangle size={13} color={C.amber} style={{ flexShrink: 0, marginTop: "1px" }} />
+                  <span style={{ fontFamily: MONO, fontSize: "9px", color: C.amber, letterSpacing: "0.04em", lineHeight: 1.6 }}>
+                    Wrong wallet connected ({shortAddr(activeWallet!)}). Only your bound wallet
+                    {" "}{shortAddr(savedWallet!)} earns points. Switch back to it, or press
+                    {" "}CHANGE WALLET to make {shortAddr(activeWallet!)} your eligible wallet.
+                  </span>
+                </div>
+              )}
+
+              {/* Confirm change */}
+              {confirmChange && (
+                <div style={{ padding: "14px 20px", background: "rgba(245,166,35,0.06)", borderBottom: `1px solid ${C.border}` }}>
+                  <div style={{ fontFamily: MONO, fontSize: "9px", color: C.amber, letterSpacing: "0.04em", lineHeight: 1.6, marginBottom: "10px" }}>
+                    Change your eligible wallet to {activeWallet ? shortAddr(activeWallet) : "the connected wallet"}?
+                    Your old wallet {savedWallet ? shortAddr(savedWallet) : ""} will stop earning points.
+                    Existing points stay with your account.
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button onClick={handleChangeWallet} disabled={walletBusy || !activeWallet} style={{ fontFamily: MONO, fontSize: "8px", color: "#000", background: C.amber, border: "none", borderRadius: "4px", padding: "6px 12px", cursor: walletBusy ? "wait" : "pointer", letterSpacing: "0.1em" }}>
+                      {walletBusy ? "…" : "CONFIRM CHANGE"}
+                    </button>
+                    <button onClick={() => setConfirmChange(false)} style={{ fontFamily: MONO, fontSize: "8px", color: C.muted, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "4px", padding: "6px 12px", cursor: "pointer", letterSpacing: "0.1em" }}>
+                      CANCEL
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* First-time bind hint */}
+              {!savedWallet && wallet.isConnected && wallet.address && (
+                <div style={{ padding: "12px 20px", background: "rgba(0,200,150,0.04)", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Wallet size={12} color={C.green} />
+                  <span style={{ fontFamily: MONO, fontSize: "9px", color: C.green, letterSpacing: "0.04em" }}>
+                    {shortAddr(wallet.address)} connected — click LINK WALLET to bind it to your account.
                   </span>
                 </div>
               )}
@@ -590,15 +683,24 @@ export default function ProfilePage() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontFamily: FONT, fontSize: "12px", color: C.text, fontWeight: 700, letterSpacing: "0.04em" }}>Discord</div>
-                    {editSocials
-                      ? <input className="inp" value={discordVal} onChange={(e) => setDiscordVal(e.target.value)} placeholder="your_handle" style={{ marginTop: "6px" }} />
-                      : <div style={{ fontFamily: MONO, fontSize: "9px", color: extra?.discordHandle ? C.blue : C.mutedL, marginTop: "2px" }}>
-                          {extra?.discordHandle ? `@${extra.discordHandle}` : "Not set"}
+                    {extra?.discordVerified
+                      ? <div style={{ fontFamily: MONO, fontSize: "9px", color: C.green, marginTop: "2px" }}>
+                          🔒 Verified{extra.discordUsername ? ` as ${extra.discordUsername}` : ""} — locked
                         </div>
+                      : editSocials
+                        ? <input className="inp" value={discordVal} onChange={(e) => setDiscordVal(e.target.value)} placeholder="your_handle" style={{ marginTop: "6px" }} />
+                        : <div style={{ fontFamily: MONO, fontSize: "9px", color: extra?.discordHandle ? C.blue : C.mutedL, marginTop: "2px" }}>
+                            {extra?.discordHandle ? `@${extra.discordHandle}` : "Not set"}
+                          </div>
                     }
                   </div>
                 </div>
-                {!editSocials && <ConnectBadge connected={!!extra?.discordHandle} label="NOT SET" />}
+                {extra?.discordVerified
+                  ? <button onClick={() => unlinkSocial("discord")} disabled={unlinkBusy === "discord"} style={{ fontFamily: MONO, fontSize: "8px", color: C.red, background: "transparent", border: `1px solid ${C.red}40`, borderRadius: "4px", padding: "4px 10px", cursor: "pointer", letterSpacing: "0.1em", flexShrink: 0 }}>
+                      {unlinkBusy === "discord" ? "…" : "UNLINK"}
+                    </button>
+                  : !editSocials && <ConnectBadge connected={!!extra?.discordHandle} label="NOT SET" />
+                }
               </div>
 
               {/* Telegram */}
@@ -609,15 +711,24 @@ export default function ProfilePage() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontFamily: FONT, fontSize: "12px", color: C.text, fontWeight: 700, letterSpacing: "0.04em" }}>Telegram</div>
-                    {editSocials
-                      ? <input className="inp" value={telegramVal} onChange={(e) => setTelegramVal(e.target.value)} placeholder="your_handle" style={{ marginTop: "6px" }} />
-                      : <div style={{ fontFamily: MONO, fontSize: "9px", color: extra?.telegramHandle ? "#26A9E0" : C.mutedL, marginTop: "2px" }}>
-                          {extra?.telegramHandle ? `@${extra.telegramHandle}` : "Not set"}
+                    {extra?.telegramVerified
+                      ? <div style={{ fontFamily: MONO, fontSize: "9px", color: C.green, marginTop: "2px" }}>
+                          🔒 Verified{extra.telegramUsername ? ` as @${extra.telegramUsername}` : ""} — locked
                         </div>
+                      : editSocials
+                        ? <input className="inp" value={telegramVal} onChange={(e) => setTelegramVal(e.target.value)} placeholder="your_handle" style={{ marginTop: "6px" }} />
+                        : <div style={{ fontFamily: MONO, fontSize: "9px", color: extra?.telegramHandle ? "#26A9E0" : C.mutedL, marginTop: "2px" }}>
+                            {extra?.telegramHandle ? `@${extra.telegramHandle}` : "Not set"}
+                          </div>
                     }
                   </div>
                 </div>
-                {!editSocials && <ConnectBadge connected={!!extra?.telegramHandle} label="NOT SET" />}
+                {extra?.telegramVerified
+                  ? <button onClick={() => unlinkSocial("telegram")} disabled={unlinkBusy === "telegram"} style={{ fontFamily: MONO, fontSize: "8px", color: C.red, background: "transparent", border: `1px solid ${C.red}40`, borderRadius: "4px", padding: "4px 10px", cursor: "pointer", letterSpacing: "0.1em", flexShrink: 0 }}>
+                      {unlinkBusy === "telegram" ? "…" : "UNLINK"}
+                    </button>
+                  : !editSocials && <ConnectBadge connected={!!extra?.telegramHandle} label="NOT SET" />
+                }
               </div>
             </Card>
 
