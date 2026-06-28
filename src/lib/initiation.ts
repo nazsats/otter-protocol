@@ -490,11 +490,20 @@ export async function recordTaskOffchain(
   // Update total signal weight — atomic increment, works even if field doesn't exist yet
   await setDoc(doc(db, "users", uid), { signalWeight: increment(signal), updatedAt: serverTimestamp() }, { merge: true });
 
-  // Log to activity feed
-  await addDoc(collection(db, "activity"), {
-    type: "initiation", uid, taskId, signal, txHash: txHash || null,
-    timestamp: serverTimestamp(),
-  });
+  // Best-effort activity log. Firestore rules only allow clients to create
+  // `type: 'join'` activity entries (value-bearing events are written
+  // server-side), so this create is EXPECTED to be denied for off-chain
+  // self-claims. It must NOT throw — otherwise the whole record fails after the
+  // task was already saved above, which made the UI show "failed" and forced a
+  // second click. Wrapping it keeps a single click working.
+  try {
+    await addDoc(collection(db, "activity"), {
+      type: "initiation", uid, taskId, signal, txHash: txHash || null,
+      timestamp: serverTimestamp(),
+    });
+  } catch {
+    /* activity feed is non-critical here; ignore permission/network errors */
+  }
 }
 
 export async function submitManualTask(

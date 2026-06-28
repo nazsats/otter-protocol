@@ -60,19 +60,23 @@ export async function POST(req: NextRequest) {
     );
     const memberData = await memberRes.json();
 
+    // FAIL CLOSED: if the bot cannot read membership (it must be an admin of the
+    // channel, and TELEGRAM_CHANNEL_ID must be correct), we must NOT credit the
+    // task — otherwise non-members get marked complete without joining.
     if (!memberData.ok) {
-      // If bot can't check (e.g. not admin), allow with a warning logged
-      console.warn("[verify/telegram] getChatMember failed:", memberData.description);
-      // Still proceed — hash validation already proved the user has Telegram
-    } else {
-      const status = memberData.result?.status as string;
-      const isMember = ["creator", "administrator", "member"].includes(status);
-      if (!isMember) {
-        return NextResponse.json({
-          error: "You have not joined the channel yet. Join first, then verify.",
-          status,
-        }, { status: 403 });
-      }
+      console.error("[verify/telegram] getChatMember failed:", memberData.description);
+      return NextResponse.json({
+        error: "Membership check unavailable — make sure you've joined, then try again.",
+      }, { status: 503 });
+    }
+
+    const status   = memberData.result?.status as string;
+    const isMember = ["creator", "administrator", "member"].includes(status);
+    if (!isMember) {
+      return NextResponse.json({
+        error: "You have not joined the channel yet. Join first, then verify.",
+        status,
+      }, { status: 403 });
     }
 
     // ── 4. Bind identity + mark verified ──────────────────────────────────
@@ -119,11 +123,13 @@ export async function POST(req: NextRequest) {
       }, { merge: true });
       batch.set(userRef, { signalWeight: FieldValue.increment(SIGNAL) }, { merge: true });
       batch.set(db.collection("activity").doc(`verify_telegram_${uid}`), {
-        type:      "initiation",
+        type:        "initiation",
         uid,
-        taskId:    TASK_ID,
-        signal:    SIGNAL,
-        timestamp: FieldValue.serverTimestamp(),
+        displayName: userSnap.data()?.displayName || tgUsername || "A Rafter",
+        mission:     "Joined the Telegram Channel",
+        taskId:      TASK_ID,
+        signal:      SIGNAL,
+        timestamp:   FieldValue.serverTimestamp(),
       });
     }
     await batch.commit();

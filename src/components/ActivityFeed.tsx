@@ -5,12 +5,14 @@ import { ActivityEntry } from "@/lib/missions";
 
 const C = { card: "#111", border: "#1F1F1F", gold: "#C9A84C", text: "#E8E8E8", muted: "#5C5C5C", green: "#00C896", purple: "#A78BFA", orange: "#F5A623" };
 
-const TYPE_META = {
-  join:     { label: "joined the Raft",    color: C.green,  icon: "🌊" },
-  mission:  { label: "completed a mission",color: C.purple, icon: "⚡" },
-  claim:    { label: "claimed OTTER",      color: C.gold,   icon: "🦦" },
-  referral: { label: "referred a friend",  color: C.orange, icon: "🤝" },
-  transfer: { label: "sent OTTER",         color: C.text,   icon: "➡️" },
+const TYPE_META: Record<string, { label: string; color: string; icon: string }> = {
+  join:         { label: "joined the Raft",     color: C.green,  icon: "🌊" },
+  mission:      { label: "completed a mission", color: C.purple, icon: "⚡" },
+  claim:        { label: "claimed OTTER",       color: C.gold,   icon: "🦦" },
+  referral:     { label: "referred a friend",   color: C.orange, icon: "🤝" },
+  transfer:     { label: "sent OTTER",          color: C.text,   icon: "➡️" },
+  initiation:   { label: "earned signal",       color: C.gold,   icon: "◈" },
+  admin_points: { label: "received points",     color: C.purple, icon: "✦" },
 };
 
 function timeAgo(seconds?: number): string {
@@ -76,16 +78,21 @@ export default function ActivityFeed() {
               {/* Text */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: "13px", lineHeight: 1.4 }}>
-                  <span style={{ fontWeight: 700, color: meta.color }}>{entry.displayName}</span>
+                  <span style={{ fontWeight: 700, color: meta.color }}>{entry.displayName || "A Rafter"}</span>
                   <span style={{ color: C.muted }}> {meta.label}</span>
                   {entry.mission && <span style={{ color: C.text }}> — <em style={{ fontStyle: "normal" }}>{entry.mission}</em></span>}
                 </div>
-                {entry.amount && (
+                {entry.amount ? (
                   <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
                     <Zap size={10} color={C.gold} />
                     <span style={{ color: C.gold, fontSize: "11px", fontWeight: 700 }}>+{entry.amount} OTTER</span>
                   </div>
-                )}
+                ) : entry.signal ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
+                    <Zap size={10} color={C.gold} />
+                    <span style={{ color: C.gold, fontSize: "11px", fontWeight: 700 }}>+{entry.signal} SIGNAL</span>
+                  </div>
+                ) : null}
               </div>
 
               {/* Time + tx link */}

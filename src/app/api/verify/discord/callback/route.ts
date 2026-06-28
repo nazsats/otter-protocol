@@ -131,11 +131,13 @@ export async function GET(req: NextRequest) {
     }, { merge: true });
     batch.set(userRef, { signalWeight: FieldValue.increment(SIGNAL) }, { merge: true });
     batch.set(db.collection("activity").doc(`verify_discord_${uid}`), {
-      type:      "initiation",
+      type:        "initiation",
       uid,
-      taskId:    TASK_ID,
-      signal:    SIGNAL,
-      timestamp: FieldValue.serverTimestamp(),
+      displayName: userSnap.data()?.displayName || discordUsername || "A Rafter",
+      mission:     "Joined the Discord Den",
+      taskId:      TASK_ID,
+      signal:      SIGNAL,
+      timestamp:   FieldValue.serverTimestamp(),
     });
   }
   await batch.commit();

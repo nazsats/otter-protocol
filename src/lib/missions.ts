@@ -254,11 +254,12 @@ export async function getActivityFeed(limit = 20) {
 
 export interface ActivityEntry {
   id:          string;
-  type:        "join" | "mission" | "claim" | "referral" | "transfer";
+  type:        "join" | "mission" | "claim" | "referral" | "transfer" | "initiation" | "admin_points";
   displayName: string;
   mission?:    string;
   badge?:      string;
   amount?:     number;
+  signal?:     number;
   txHash?:     string;
   timestamp?:  { seconds: number };
 }
