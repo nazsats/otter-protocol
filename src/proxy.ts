@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAccessToken, ACCESS_COOKIE } from "@/lib/access-token";
 
-// Public paths that bypass the access-code gate
-const PUBLIC_PATHS = new Set(["/", "/api/auth/access", "/admin"]);
+// ── ACCESS GATE MASTER SWITCH ───────────────────────────────────────────────
+// The public site has launched, so the invite/access-code gate is turned OFF:
+// no route requires a code, and the old gate route ("/") sends visitors to the
+// landing page instead of showing the code prompt. The gate page itself
+// (app/page.tsx) and the access API are left intact — set this back to `true`
+// to re-enable the invite wall exactly as before.
+const GATE_ENABLED = false;
+
+// Public paths that bypass the access-code gate. The gate page now lives at
+// "/gate" (the root "/" renders the landing page).
+const PUBLIC_PATHS = new Set(["/gate", "/api/auth/access", "/admin"]);
 
 // Paths that are always allowed (static assets, Next.js internals).
 // IMPORTANT: public static files (e.g. /otter-logo.png) must be exempt from the
@@ -69,6 +78,10 @@ export async function proxy(req: NextRequest) {
     });
   }
 
+  // Gate disabled (site launched): never show the code prompt. The root renders
+  // the landing page directly and every path passes through untouched.
+  if (!GATE_ENABLED) return NextResponse.next();
+
   // Always allow the gate page and the access API
   if (PUBLIC_PATHS.has(pathname)) return NextResponse.next();
 
@@ -82,7 +95,7 @@ export async function proxy(req: NextRequest) {
   // HMAC check and is redirected to the gate.
   const access = req.cookies.get(ACCESS_COOKIE);
   if (!(await verifyAccessToken(access?.value))) {
-    return NextResponse.redirect(new URL("/", req.url));
+    return NextResponse.redirect(new URL("/gate", req.url));
   }
 
   return NextResponse.next();
