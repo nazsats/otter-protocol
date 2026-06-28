@@ -23,27 +23,39 @@ export async function POST(req: NextRequest) {
     if (!ethers.isAddress(walletAddress)) return err("Invalid wallet address", 400);
     if (missionId.length > 64) return err("Invalid field length", 400);
 
-    // ── 2. Rate limiting — per user + per IP ─────────────
-    const ip         = getClientIp(req);
-    const [userRL, ipRL] = await Promise.all([
-      checkRateLimit(`claim:uid:${uid}`,       5, 3600),   // 5 claims per hour per user
-      checkRateLimit(`claim:ip:${ip}`,         20, 3600),  // 20 claims per hour per IP
-    ]);
-    if (!userRL.allowed) return err(`Rate limit: retry in ${userRL.resetInSeconds}s`, 429);
-    if (!ipRL.allowed)   return err(`Rate limit: retry in ${ipRL.resetInSeconds}s`, 429);
-
-    // ── 3. Find mission (server-authoritative amount) ────
+    // ── 2. Find mission + contract readiness FIRST ───────
+    // (checked before the rate limit so no-op clicks — unknown mission or a
+    //  contract that isn't deployed yet — never burn the user's claim quota)
     const mission = MISSIONS.find((m) => m.id === missionId);
     if (!mission) return err("Unknown mission", 400);
     if (!CONTRACT) return err("Contract not deployed yet — check back soon", 503);
 
-    const db = getAdminDb();
-
-    // ── 4. Atomic verification + claim prevention ────────
-    // Use Firestore transaction to atomically check + reserve the claim
-    // (fixes TOCTOU race condition)
+    const db       = getAdminDb();
     const claimId  = `${uid}_${missionId}`;
     const claimRef = db.collection("otter_claims").doc(claimId);
+
+    // ── 3. Fast duplicate short-circuit ──────────────────
+    // Already-claimed clicks return 409 WITHOUT consuming the rate limit, so a
+    // user re-clicking finished missions can't lock themselves out.
+    const existing = await claimRef.get();
+    if (existing.exists && existing.data()?.status === "complete")
+      return err("Already claimed", 409);
+
+    // ── 4. Rate limiting — only genuine new-claim attempts count ──
+    // 14 missions exist, so the per-user cap has headroom for claiming them all
+    // plus the odd retry. The atomic reservation below is the real double-spend
+    // guard; this is just abuse protection.
+    const ip = getClientIp(req);
+    const [userRL, ipRL] = await Promise.all([
+      checkRateLimit(`claim:uid:${uid}`, 25, 3600),   // 25 claims per hour per user
+      checkRateLimit(`claim:ip:${ip}`,   50, 3600),   // 50 claims per hour per IP
+    ]);
+    if (!userRL.allowed) return err(`Too many claims — retry in ${userRL.resetInSeconds}s`, 429);
+    if (!ipRL.allowed)   return err(`Too many claims — retry in ${ipRL.resetInSeconds}s`, 429);
+
+    // ── 5. Atomic verification + claim prevention ────────
+    // Use Firestore transaction to atomically check + reserve the claim
+    // (fixes TOCTOU race condition)
 
     let alreadyClaimed = false;
     await db.runTransaction(async (tx) => {
