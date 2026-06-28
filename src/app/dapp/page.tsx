@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import WalletConnect from "@/components/web3/WalletConnect";
@@ -8,6 +8,7 @@ import InitiationTerminal from "@/components/InitiationTerminal";
 import ActivityFeed from "@/components/ActivityFeed";
 import DropHunt from "@/components/DropHunt";
 import MemeArena from "@/components/MemeArena";
+import DailyStreak from "@/components/DailyStreak";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { useWallet } from "@/hooks/useWallet";
@@ -49,7 +50,7 @@ const TIER_BG      = ["rgba(92,92,92,0.08)", "rgba(167,139,250,0.08)", "rgba(201
 const TIER_DAYS    = [0, 30, 90];
 const TIER_REWARDS = ["1.0×", "1.5×", "2.0×"];
 
-type Tab = "dashboard" | "initiation" | "missions" | "onchain" | "leaderboard" | "drops" | "memes";
+type Tab = "dashboard" | "daily" | "initiation" | "missions" | "onchain" | "leaderboard" | "drops" | "memes";
 
 export default function DAppPage() {
   const { user, profile, openAuthModal } = useAuth();
@@ -107,6 +108,20 @@ export default function DAppPage() {
   const [progress,   setProgress]   = useState({ done: 0, total: 0, pts: 0, pct: 0 });
   // Initiation signal weight (separate system)
   const [initSignal, setInitSignal] = useState(0);
+
+  // Total-points "bump" animation when the total increases (mission/spin reward)
+  const totalPoints = (progress.pts + initSignal);
+  const [bumpTotal, setBumpTotal] = useState(false);
+  const prevTotalRef = useRef(0);
+  useEffect(() => {
+    const prev = prevTotalRef.current;
+    prevTotalRef.current = totalPoints;
+    if (totalPoints > prev && prev > 0) {
+      setBumpTotal(true);
+      const t = setTimeout(() => setBumpTotal(false), 520);
+      return () => clearTimeout(t);
+    }
+  }, [totalPoints]);
 
   // ── FETCH ON-CHAIN DATA ──────────────────────────────────────────────────
   const fetchChain = useCallback(async () => {
@@ -238,6 +253,7 @@ export default function DAppPage() {
   // ── NAV TABS ─────────────────────────────────────────────────────────────
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "dashboard",   label: "Dashboard",   icon: <Activity size={14} /> },
+    { id: "daily",       label: "◈ Daily Spin", icon: <span style={{ fontSize: "13px" }}>🔥</span> },
     { id: "initiation",  label: "◈ Initiation", icon: <Zap size={14} /> },
     { id: "missions",    label: "Missions",    icon: <BarChart2 size={14} /> },
     { id: "memes",       label: "Meme Arena",  icon: <span style={{ fontSize: "13px" }}>🔥</span> },
@@ -338,6 +354,49 @@ export default function DAppPage() {
             {tab === "dashboard" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
 
+                {/* ★ SPECIAL FEATURE — Daily Streak & Spin highlight */}
+                <button onClick={() => setTab("daily")} className="feature-banner btn-press"
+                  style={{
+                    textAlign: "left", cursor: "pointer", width: "100%",
+                    background: "linear-gradient(120deg, #1A1306 0%, #0D0A04 55%, #0A0800 100%)",
+                    border: "1px solid rgba(201,168,76,0.35)", borderRadius: "14px",
+                    padding: "18px 20px", display: "flex", alignItems: "center",
+                    justifyContent: "space-between", gap: "14px", flexWrap: "wrap",
+                    boxShadow: "0 0 28px rgba(201,168,76,0.08)",
+                  }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                    <div className="streak-flame-live" style={{
+                      width: "46px", height: "46px", borderRadius: "12px", flexShrink: 0,
+                      background: "radial-gradient(circle at 35% 30%, #F4DC8A, #C9A84C 55%, #8B6000)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      boxShadow: "0 0 18px rgba(201,168,76,0.45)",
+                    }}>
+                      <span style={{ fontSize: "22px" }}>🔥</span>
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <span style={{ fontFamily: "var(--font-cinzel, serif)", fontWeight: 900, fontSize: "15px", color: C.text, letterSpacing: "0.04em" }}>
+                          Daily Streak & Spin
+                        </span>
+                        <span style={{ background: "rgba(255,69,69,0.12)", color: "#FF6B6B", border: "1px solid rgba(255,69,69,0.3)", borderRadius: "20px", padding: "1px 9px", fontSize: "9px", fontWeight: 800, fontFamily: "var(--font-cinzel, serif)", letterSpacing: "0.1em" }}>
+                          NEW
+                        </span>
+                      </div>
+                      <div style={{ fontFamily: "var(--font-geist-mono)", color: C.mutedH, fontSize: "11px", letterSpacing: "0.04em", marginTop: "4px" }}>
+                        Check in every day · spin the wheel · win up to 500 points
+                      </div>
+                    </div>
+                  </div>
+                  <span style={{
+                    display: "flex", alignItems: "center", gap: "6px",
+                    background: "linear-gradient(135deg,#C9A84C,#E2BF6E)", color: "#000",
+                    borderRadius: "9px", padding: "9px 16px", fontSize: "12px", fontWeight: 800,
+                    fontFamily: "var(--font-cinzel, serif)", letterSpacing: "0.06em", whiteSpace: "nowrap",
+                  }}>
+                    Claim today <ArrowRight size={14} />
+                  </span>
+                </button>
+
                 {/* Season 1 banner */}
                 <div className="season-pulse" style={{
                   background: "linear-gradient(135deg, #0D0A04 0%, #080600 100%)",
@@ -433,8 +492,8 @@ export default function DAppPage() {
                         color: C.mutedH, fontSize: "11px", fontWeight: 700,
                         letterSpacing: "0.14em", marginBottom: "8px",
                       }}>◈ TOTAL POINTS</div>
-                      <div style={{ fontSize: "48px", fontWeight: 900, background: `linear-gradient(135deg, ${C.gold}, ${C.goldL})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", lineHeight: 1 }}>
-                        {user ? (progress.pts + initSignal).toLocaleString() : "—"}
+                      <div className={bumpTotal ? "total-bump" : ""} style={{ display: "inline-block", fontSize: "48px", fontWeight: 900, background: `linear-gradient(135deg, ${C.gold}, ${C.goldL})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", lineHeight: 1 }}>
+                        {user ? totalPoints.toLocaleString() : "—"}
                       </div>
                       <div style={{
                         fontFamily: "var(--font-geist-mono)",
@@ -565,6 +624,23 @@ export default function DAppPage() {
                   <div style={{ background: "rgba(201,168,76,0.04)", border: `1px solid rgba(201,168,76,0.12)`, borderRadius: "12px", padding: "20px", textAlign: "center" }}>
                     <div style={{ fontWeight: 700, marginBottom: "6px" }}>Join the Raft</div>
                     <div style={{ color: C.muted, fontSize: "13px", marginBottom: "14px" }}>Sign in to track missions, earn points, and claim your Rafter position.</div>
+                    <button onClick={openAuthModal}
+                      style={{ background: "linear-gradient(135deg,#C9A84C,#E2BF6E)", color: "#000", border: "none", borderRadius: "10px", padding: "10px 24px", fontWeight: 700, fontSize: "13px", cursor: "pointer" }}>
+                      Sign In / Register
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ════ DAILY STREAK & SPIN ════ */}
+            {tab === "daily" && (
+              <div style={{ animation: "tab-slide 0.3s ease both", display: "flex", flexDirection: "column", gap: "16px" }}>
+                <DailyStreak uid={user?.uid} onReward={refreshPoints} />
+                {!user && (
+                  <div style={{ background: "rgba(201,168,76,0.04)", border: `1px solid rgba(201,168,76,0.12)`, borderRadius: "12px", padding: "20px", textAlign: "center" }}>
+                    <div style={{ fontWeight: 700, marginBottom: "6px" }}>Sign in to start your streak</div>
+                    <div style={{ color: C.muted, fontSize: "13px", marginBottom: "14px" }}>Daily check-ins build a streak and unlock a spin every day. Don&apos;t break the chain.</div>
                     <button onClick={openAuthModal}
                       style={{ background: "linear-gradient(135deg,#C9A84C,#E2BF6E)", color: "#000", border: "none", borderRadius: "10px", padding: "10px 24px", fontWeight: 700, fontSize: "13px", cursor: "pointer" }}>
                       Sign In / Register
@@ -848,6 +924,11 @@ export default function DAppPage() {
 
             {/* Wallet */}
             <WalletConnect />
+
+            {/* Daily streak quick widget */}
+            {user && tab !== "daily" && (
+              <DailyStreak uid={user.uid} onReward={refreshPoints} compact />
+            )}
 
             {/* Rafter # */}
             {user && (

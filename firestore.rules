@@ -40,6 +40,13 @@ service cloud.firestore {
       allow update, delete: if false; // Admin SDK only
     }
 
+    // Daily streak + spin: owner reads own, server (Admin SDK) writes.
+    // All value-bearing updates (streak, spin prize → points) happen server-side.
+    match /daily_streaks/{userId} {
+      allow read:                   if request.auth != null && request.auth.uid == userId;
+      allow create, update, delete: if false; // Admin SDK only
+    }
+
     // OTTER claims: server writes, user reads own
     match /otter_claims/{claimId} {
       allow read:             if request.auth != null

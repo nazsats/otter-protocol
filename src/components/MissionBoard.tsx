@@ -42,6 +42,16 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
   const [claimingOtter, setClaimingOtter] = useState<string | null>(null);
   const [claimAllBusy,  setClaimAllBusy]  = useState(false);
   const [claimedTxs,    setClaimedTxs]    = useState<Record<string, string>>({});
+  // Completion FX — one-shot seal + card glow + hero points bump
+  const [fxId,          setFxId]          = useState<string | null>(null);
+  const [bumpPts,       setBumpPts]       = useState(false);
+
+  const triggerFx = useCallback((missionId: string) => {
+    setFxId(missionId);
+    setBumpPts(true);
+    setTimeout(() => setFxId((c) => (c === missionId ? null : c)), 1200);
+    setTimeout(() => setBumpPts(false), 560);
+  }, []);
 
   const load = useCallback(async () => {
     const [mData, cData] = await Promise.all([
@@ -66,6 +76,7 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
         setClaiming(missionId);
         await completeMission(uid, missionId);
         setCompleted((c) => ({ ...c, [missionId]: true }));
+        triggerFx(missionId);
         const m = MISSIONS.find((m) => m.id === missionId);
         toast(`+${m?.points} pts — ${m?.title} complete!`, "success");
         onComplete?.();
@@ -82,6 +93,7 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
     setClaiming(missionId);
     await completeMission(uid, missionId);
     setCompleted((c) => ({ ...c, [missionId]: true }));
+    triggerFx(missionId);
     const m = MISSIONS.find((m) => m.id === missionId);
     toast(`+${m?.points} pts — ${m?.title} complete!`, "success");
     onComplete?.();
@@ -190,7 +202,7 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
           {/* Stats cluster */}
           <div style={{ display: "flex", gap: "12px" }}>
             <div style={{ background: "rgba(201,168,76,0.06)", border: "1px solid rgba(201,168,76,0.15)", borderRadius: "10px", padding: "12px 16px", textAlign: "center" }}>
-              <div style={{ fontFamily: MONO, fontSize: "22px", fontWeight: 900, background: `linear-gradient(135deg, ${C.gold}, ${C.goldL})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", lineHeight: 1 }}>
+              <div className={bumpPts ? "total-bump" : ""} style={{ display: "inline-block", fontFamily: MONO, fontSize: "22px", fontWeight: 900, background: `linear-gradient(135deg, ${C.gold}, ${C.goldL})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", lineHeight: 1 }}>
                 {progress.pts.toLocaleString()}
               </div>
               <div style={{ fontFamily: FONT, fontSize: "9px", color: C.muted, letterSpacing: "0.12em", marginTop: "4px" }}>POINTS</div>
@@ -304,6 +316,7 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
 
           return (
             <div key={mission.id}
+              className={fxId === mission.id ? "complete-glow" : ""}
               style={{ background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: "14px", overflow: "hidden", transition: "border-color 0.2s" }}
               onMouseEnter={(e) => { if (!otterClaimed) e.currentTarget.style.borderColor = done ? "rgba(201,168,76,0.3)" : C.borderH; }}
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = cardBorder; }}
@@ -312,7 +325,7 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
               <div style={{ padding: "16px 20px", display: "flex", alignItems: "flex-start", gap: "14px" }}>
 
                 {/* Badge icon */}
-                <div style={{ width: "44px", height: "44px", borderRadius: "12px", flexShrink: 0, position: "relative",
+                <div className={fxId === mission.id ? "seal-stamp" : ""} style={{ width: "44px", height: "44px", borderRadius: "12px", flexShrink: 0, position: "relative",
                   background: otterClaimed ? "rgba(0,200,150,0.08)" : done ? "rgba(201,168,76,0.08)" : "rgba(255,255,255,0.03)",
                   border: `1px solid ${otterClaimed ? "rgba(0,200,150,0.2)" : done ? "rgba(201,168,76,0.2)" : C.border}`,
                   display: "flex", alignItems: "center", justifyContent: "center",

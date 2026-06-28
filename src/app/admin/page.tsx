@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { MISSIONS } from "@/lib/missions";
 import {
   INITIATION_TASKS, CATEGORY_META, DIFFICULTY_META,
-  getPendingApprovals, approveManualTask, rejectManualTask,
+  getPendingApprovals,
   saveTaskOverride, getTaskOverrides, applyTaskOverrides,
   type PendingApproval, type InitiationTask, type TaskCategory, type TaskOverride,
 } from "@/lib/initiation";
@@ -273,7 +273,7 @@ export default function AdminPage() {
           {tab === "overview"   && <OverviewTab      token={token} toast={toast.show} />}
           {tab === "users"      && <UsersTab         token={token} toast={toast.show} />}
           {tab === "initiation" && <InitiationAdminTab toast={toast.show} />}
-          {tab === "approvals"  && <ApprovalsTab     toast={toast.show} />}
+          {tab === "approvals"  && <ApprovalsTab     token={token} toast={toast.show} />}
           {tab === "whitelist"  && <WhitelistTab     token={token} toast={toast.show} />}
           {tab === "season"     && <SeasonTab        token={token} toast={toast.show} />}
           {tab === "missions"   && <MissionsTab      token={token} toast={toast.show} />}
@@ -1047,7 +1047,7 @@ function InitiationAdminTab({ toast }: { toast: (m: string, ok?: boolean) => voi
 // ═══════════════════════════════════════════════════════════════════════════
 // Approvals Tab — Manual task submission review queue
 // ═══════════════════════════════════════════════════════════════════════════
-function ApprovalsTab({ toast }: { toast: (m: string, ok?: boolean) => void }) {
+function ApprovalsTab({ token, toast }: { token: string; toast: (m: string, ok?: boolean) => void }) {
   const [approvals, setApprovals] = useState<PendingApproval[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [busy,      setBusy]      = useState<string | null>(null);
@@ -1066,14 +1066,19 @@ function ApprovalsTab({ toast }: { toast: (m: string, ok?: boolean) => void }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Approve/reject run server-side (Admin SDK) — client writes are blocked by
+  // Firestore rules (pending_approvals is update:false + cross-user credit).
   const handleApprove = async (a: PendingApproval) => {
     setBusy(a.id);
     try {
-      await approveManualTask(a.id, a.uid, a.taskId);
+      await adminFetch("/api/admin/approvals", token, {
+        method: "POST",
+        body:   JSON.stringify({ approvalId: a.id, action: "approve" }),
+      });
       toast(`Approved: ${a.taskId}`, true);
       await load();
-    } catch {
-      toast("Approval failed", false);
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : "Approval failed", false);
     }
     setBusy(null);
   };
@@ -1081,11 +1086,14 @@ function ApprovalsTab({ toast }: { toast: (m: string, ok?: boolean) => void }) {
   const handleReject = async (a: PendingApproval) => {
     setBusy(a.id + "_r");
     try {
-      await rejectManualTask(a.id);
+      await adminFetch("/api/admin/approvals", token, {
+        method: "POST",
+        body:   JSON.stringify({ approvalId: a.id, action: "reject" }),
+      });
       toast(`Rejected: ${a.taskId}`, true);
       await load();
-    } catch {
-      toast("Rejection failed", false);
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : "Rejection failed", false);
     }
     setBusy(null);
   };

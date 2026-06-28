@@ -526,17 +526,10 @@ export async function getPendingApprovals(): Promise<PendingApproval[]> {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as PendingApproval));
 }
 
-export async function approveManualTask(approvalId: string, uid: string, taskId: string): Promise<void> {
-  const task = INITIATION_TASKS.find((t) => t.id === taskId);
-  if (!task) return;
-
-  await setDoc(doc(db, "pending_approvals", approvalId), { status: "approved" }, { merge: true });
-  await recordTaskOffchain(uid, taskId, task.signal);
-}
-
-export async function rejectManualTask(approvalId: string): Promise<void> {
-  await setDoc(doc(db, "pending_approvals", approvalId), { status: "rejected" }, { merge: true });
-}
+// NOTE: approving/rejecting a manual submission is done SERVER-SIDE via
+// POST /api/admin/approvals (Admin SDK). It cannot run on the client: Firestore
+// rules make pending_approvals update-only-false and forbid crediting another
+// user's user_initiation/users docs. Do not reintroduce a client-side version.
 
 export function calcInitiationProgress(completed: Record<string, CompletedTask>) {
   const done  = Object.keys(completed).length;
