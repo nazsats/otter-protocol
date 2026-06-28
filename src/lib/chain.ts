@@ -132,7 +132,19 @@ export async function treasuryTransfer(
   );
   if (balance < amount) throw new Error("Insufficient treasury balance");
 
-  // Reserve a nonce that no concurrent invocation can reuse.
+  // Estimate gas BEFORE reserving a nonce. estimateGas consumes no nonce, so if
+  // it fails here (treasury out of Sepolia ETH, or a revert) we bail out without
+  // burning one. Reserving first — as we used to — meant every failed/un-broadcast
+  // attempt advanced the Firestore counter past the chain, eventually handing out
+  // a gapped nonce that left transfers stuck in the mempool forever.
+  const gasLimit = await withRpc(async (p) => {
+    const c   = new ethers.Contract(contractAddress, OTTER_ABI, getWallet(p));
+    const est = await c.transfer.estimateGas(toAddress, amount);
+    return (est * BigInt(120)) / BigInt(100);
+  });
+
+  // Reserve a nonce that no concurrent invocation can reuse — only now that the
+  // transfer is known to be viable.
   const nonce = await reserveNonce(treasuryAddr);
 
   // Broadcast + confirm, retrying across RPCs on transient failure. The nonce is
@@ -143,9 +155,6 @@ export async function treasuryTransfer(
       const provider = getProvider();
       const wallet   = getWallet(provider);
       const contract = new ethers.Contract(contractAddress, OTTER_ABI, wallet);
-
-      const gasEstimate = await contract.transfer.estimateGas(toAddress, amount);
-      const gasLimit    = (gasEstimate * BigInt(120)) / BigInt(100);
 
       const tx      = await contract.transfer(toAddress, amount, { nonce, gasLimit });
       const receipt = await tx.wait(1);

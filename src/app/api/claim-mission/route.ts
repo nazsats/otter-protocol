@@ -150,6 +150,7 @@ export async function POST(req: NextRequest) {
     if (msg.includes("Wallet does not match"))  return err("Wallet mismatch", 403);
     if (msg.includes("Mission not completed"))  return err("Mission not completed", 403);
     if (msg.includes("Insufficient treasury"))  return err("Treasury low — contact admin", 503);
+    if (msg.includes("insufficient funds"))     return err("Treasury is out of gas (Sepolia ETH) — contact admin", 503);
     if (msg.includes("DEPLOYER_PRIVATE_KEY"))   return err("Treasury wallet not configured — deploy contract first", 503);
     if (msg.includes("Invalid contract"))       return err("Contract not deployed yet — check back soon", 503);
     if (msg.includes("rejected") || msg.includes("denied")) return err("Transaction rejected", 400);
