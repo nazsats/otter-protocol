@@ -13,6 +13,7 @@ const TYPE_META: Record<string, { label: string; color: string; icon: string }> 
   transfer:     { label: "sent OTTER",          color: C.text,   icon: "➡️" },
   initiation:   { label: "earned signal",       color: C.gold,   icon: "◈" },
   admin_points: { label: "received points",     color: C.purple, icon: "✦" },
+  welcome:      { label: "claimed the welcome bonus", color: C.gold, icon: "🦦" },
 };
 
 function timeAgo(seconds?: number): string {

@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { InitiationProvider } from "@/context/InitiationContext";
+import { CelebrationProvider } from "@/context/CelebrationContext";
 import AuthGate from "@/components/auth/AuthGate";
 import AppKitProvider from "@/components/AppKitProvider";
 
@@ -31,8 +32,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <ToastProvider>
             <AuthProvider>
               <InitiationProvider>
-                <AuthGate />
-                {children}
+                <CelebrationProvider>
+                  <AuthGate />
+                  {children}
+                </CelebrationProvider>
               </InitiationProvider>
             </AuthProvider>
           </ToastProvider>

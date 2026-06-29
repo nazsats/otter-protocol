@@ -8,13 +8,14 @@ import { shortAddress, connectInjectedWallet, hasInjectedWallet } from "@/lib/wa
 
 const C = { gold: "#C9A84C", border: "#1E1A10", muted: "#8C7A5C", text: "#E8DFC8", card: "#0D0B07", goldDim: "rgba(201,168,76,0.12)" };
 
-const NAV_LINKS = [
+const NAV_LINKS: { label: string; href: string; highlight?: boolean; green?: boolean }[] = [
   { label: "Protocol",   href: "/about#eip" },
   { label: "Tokenomics", href: "/about#tokenomics" },
   { label: "Roadmap",    href: "/about#roadmap" },
   { label: "Community",  href: "/about#community" },
   { label: "EIP Draft",  href: "/eip" },
   { label: "DApp Beta",  href: "/dapp", highlight: true },
+  { label: "Claim OTTER", href: "/dapp", highlight: true, green: true },
 ];
 
 export default function Navbar() {
@@ -113,22 +114,33 @@ export default function Navbar() {
             <div style={{ display: "flex", alignItems: "center", gap: "24px" }}
               className="nav-desktop">
               {NAV_LINKS.map((item) => (
-                <Link key={item.label} href={item.href}
-                  style={{
-                    fontFamily: "var(--font-cinzel, serif)",
-                    color: item.highlight ? C.gold : C.muted,
-                    textDecoration: "none", fontSize: "11px", fontWeight: 700,
-                    letterSpacing: "0.1em", textTransform: "uppercase", transition: "color 0.15s",
-                    border: item.highlight ? `1px solid rgba(201,168,76,0.25)` : "none",
-                    padding: item.highlight ? "5px 12px" : "0",
-                    borderRadius: item.highlight ? "4px" : "0",
-                    background: item.highlight ? "rgba(201,168,76,0.06)" : "transparent",
-                  }}
-                  onMouseEnter={(e) => { if (!item.highlight) (e.target as HTMLAnchorElement).style.color = C.text; }}
-                  onMouseLeave={(e) => { if (!item.highlight) (e.target as HTMLAnchorElement).style.color = C.muted; }}
-                >
-                  {item.label}
-                </Link>
+                item.highlight ? (
+                  <Link key={item.label} href={item.href}
+                    className={`dapp-cta${item.green ? " dapp-cta-green" : ""}`}
+                    aria-label={item.green ? "Claim OTTER in the dApp" : "Open the OTTER dApp Beta"}
+                    style={{ fontFamily: "var(--font-cinzel, serif)" }}>
+                    <span className={`dapp-cta-inner${item.green ? " is-green" : ""}`} style={{
+                      fontSize: "11px", fontWeight: 800, letterSpacing: "0.1em",
+                      textTransform: "uppercase", padding: "7px 14px", gap: "7px", borderRadius: "6px",
+                    }}>
+                      <span className="dapp-cta-coin" style={{ fontSize: "12px", color: item.green ? "#002018" : undefined }}>◈</span>
+                      {item.label}
+                    </span>
+                  </Link>
+                ) : (
+                  <Link key={item.label} href={item.href}
+                    style={{
+                      fontFamily: "var(--font-cinzel, serif)",
+                      color: C.muted,
+                      textDecoration: "none", fontSize: "11px", fontWeight: 700,
+                      letterSpacing: "0.1em", textTransform: "uppercase", transition: "color 0.15s",
+                    }}
+                    onMouseEnter={(e) => { (e.target as HTMLAnchorElement).style.color = C.text; }}
+                    onMouseLeave={(e) => { (e.target as HTMLAnchorElement).style.color = C.muted; }}
+                  >
+                    {item.label}
+                  </Link>
+                )
               ))}
             </div>
 
@@ -252,12 +264,13 @@ export default function Navbar() {
                 onClick={() => setMobileOpen(false)}
                 style={{
                   fontFamily: "var(--font-cinzel, serif)",
-                  display: "block", padding: "16px 0", color: item.highlight ? C.gold : C.text,
+                  display: "block", padding: "16px 0",
+                  color: item.green ? "#00C896" : item.highlight ? C.gold : C.text,
                   textDecoration: "none", fontSize: "16px", fontWeight: 700,
                   borderBottom: `1px solid ${C.border}`, letterSpacing: "0.1em",
                   textTransform: "uppercase",
                 }}>
-                {item.label}
+                {item.green ? "◈ " : ""}{item.label}
               </Link>
             ))}
 

@@ -5,6 +5,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { MISSIONS, CATEGORY_META, getUserMissions, completeMission, calcProgress, MissionCategory } from "@/lib/missions";
 import { useToast } from "@/context/ToastContext";
+import { useCelebration } from "@/context/CelebrationContext";
 import { authFetch } from "@/lib/api";
 
 const C = {
@@ -34,6 +35,7 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
   onComplete?: () => void;
 }) {
   const toast = useToast();
+  const { celebrate } = useCelebration();
   const [completed,     setCompleted]     = useState<Record<string, boolean>>({});
   const [claimed,       setClaimed]       = useState<Record<string, boolean>>({});
   const [filter,        setFilter]        = useState<MissionCategory | "all">("all");
@@ -49,9 +51,10 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
   const triggerFx = useCallback((missionId: string) => {
     setFxId(missionId);
     setBumpPts(true);
+    celebrate();
     setTimeout(() => setFxId((c) => (c === missionId ? null : c)), 1200);
     setTimeout(() => setBumpPts(false), 560);
-  }, []);
+  }, [celebrate]);
 
   const load = useCallback(async () => {
     const [mData, cData] = await Promise.all([
@@ -125,6 +128,7 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
       if (data.txHash) setClaimedTxs((t) => ({ ...t, [missionId]: data.txHash }));
       const m = MISSIONS.find((m) => m.id === missionId);
       toast(`${m?.otterAmount} OTTER sent to your wallet!`, "success");
+      celebrate(1.6);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Claim failed";
       toast(msg, "error");
@@ -156,6 +160,7 @@ export default function MissionBoard({ uid, walletAddress, referralCount, isOnSe
         setClaimed(newClaimed);
         setClaimedTxs(newTxs);
         toast(`${data.totalOtter} OTTER claimed across ${data.claimed.length} missions!`, "success");
+        celebrate(2);
       }
     } catch (e: unknown) {
       toast(e instanceof Error ? e.message : "Claim all failed", "error");

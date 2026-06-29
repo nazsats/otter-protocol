@@ -12,7 +12,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { useWallet } from "@/hooks/useWallet";
 import { authFetch } from "@/lib/api";
-import { ExternalLink, Lock, Check, ChevronRight, Zap, Activity, Eye, EyeOff, ShieldCheck, X } from "lucide-react";
+import TelegramVerifyModal from "@/components/TelegramVerifyModal";
+import { ExternalLink, Lock, Check, ChevronRight, Zap, Activity, Eye, EyeOff, ShieldCheck } from "lucide-react";
 
 // ─── PALETTE ──────────────────────────────────────────────────────────────────
 const C = {
@@ -599,31 +600,8 @@ export default function InitiationTerminal({ onTaskComplete, contractAddress }: 
     setVerifyBusy(null);
   }, [user, loadCompleted, onTaskComplete, toast]);
 
-  // Handle ?verified=discord in URL after OAuth redirect
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("verified") === "discord") {
-      addLog("> DISCORD VERIFIED ✓");
-      toast("Discord membership verified — +100 SIGNAL", "success");
-      loadCompleted().then(() => onTaskComplete?.());
-      // Clean up URL
-      const clean = new URL(window.location.href);
-      clean.searchParams.delete("verified");
-      window.history.replaceState({}, "", clean.toString());
-    }
-    if (params.get("verify_error")) {
-      const errMsg = params.get("verify_error") || "Verification failed";
-      const readable = errMsg === "not_member"
-        ? "You are not in the Discord server — join first"
-        : errMsg;
-      toast(readable, "error");
-      const clean = new URL(window.location.href);
-      clean.searchParams.delete("verify_error");
-      window.history.replaceState({}, "", clean.toString());
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // NOTE: the Discord OAuth return (?verified=discord / ?verify_error) is handled
+  // once at the dapp page level so it works regardless of which tab is open.
 
   // ── Derived state ─────────────────────────────────────────────────────────
   // progress.signal is always fresh (recalculates from completed after every loadCompleted())
@@ -998,100 +976,6 @@ export default function InitiationTerminal({ onTaskComplete, contractAddress }: 
 
       </aside>
     </div>
-    </div>
-  );
-}
-
-// ─── TELEGRAM VERIFY MODAL ────────────────────────────────────────────────────
-declare global { interface Window { __tgOnAuth?: (u: Record<string, unknown>) => void; } }
-
-function TelegramVerifyModal({ botUsername, verifyState, errorMsg, onAuth, onClose }: {
-  botUsername:  string | null;
-  verifyState:  "idle" | "success" | "error" | "not_member";
-  errorMsg:     string;
-  onAuth:       (data: Record<string, unknown>) => void;
-  onClose:      () => void;
-}) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!botUsername || !containerRef.current) return;
-    // Inject Telegram Login Widget script
-    window.__tgOnAuth = onAuth;
-    const script = document.createElement("script");
-    script.src = "https://telegram.org/js/telegram-widget.js?22";
-    script.setAttribute("data-telegram-login",  botUsername);
-    script.setAttribute("data-size",            "large");
-    script.setAttribute("data-onauth",          "__tgOnAuth(user)");
-    script.setAttribute("data-request-access",  "write");
-    script.async = true;
-    containerRef.current.innerHTML = "";
-    containerRef.current.appendChild(script);
-    return () => { delete window.__tgOnAuth; };
-  }, [botUsername, onAuth]);
-
-  return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 9999,
-      background: "rgba(0,0,0,0.85)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      backdropFilter: "blur(4px)",
-    }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{
-        background: C.card,
-        border: `1px solid ${C.borderG}`,
-        borderRadius: "10px",
-        padding: "28px 32px",
-        minWidth: "320px", maxWidth: "400px",
-        width: "90%",
-        position: "relative",
-      }}>
-        <button onClick={onClose} style={{
-          position: "absolute", top: "14px", right: "14px",
-          background: "transparent", border: "none",
-          color: C.muted, cursor: "pointer", padding: "4px",
-        }}><X size={16} /></button>
-
-        <div style={{ fontFamily: FONT, fontSize: "11px", letterSpacing: "0.2em", color: C.gold, marginBottom: "6px" }}>
-          ◈ TELEGRAM VERIFICATION
-        </div>
-        <p style={{ fontFamily: MONO, fontSize: "11px", color: C.muted, lineHeight: 1.7, margin: "0 0 20px" }}>
-          Join our Telegram channel first, then click the button below to verify your membership.
-        </p>
-
-        {verifyState === "success" && (
-          <div style={{
-            padding: "12px 16px", borderRadius: "6px",
-            background: "rgba(0,200,150,0.08)", border: "1px solid rgba(0,200,150,0.3)",
-            fontFamily: MONO, fontSize: "11px", color: C.green,
-            display: "flex", alignItems: "center", gap: "8px",
-          }}>
-            <Check size={14} /> VERIFIED — +100 SIGNAL AWARDED
-          </div>
-        )}
-
-        {(verifyState === "error" || verifyState === "not_member") && (
-          <div style={{
-            padding: "12px 16px", borderRadius: "6px", marginBottom: "16px",
-            background: "rgba(255,91,91,0.06)", border: "1px solid rgba(255,91,91,0.25)",
-            fontFamily: MONO, fontSize: "10px", color: C.red, lineHeight: 1.6,
-          }}>
-            {errorMsg || "Verification failed — please try again."}{" "}
-            {verifyState === "not_member" && (
-              <a href="https://t.me/otterprotocol" target="_blank" rel="noopener noreferrer"
-                style={{ color: C.gold }}>Join now →</a>
-            )}
-          </div>
-        )}
-
-        {verifyState !== "success" && (
-          <div ref={containerRef} style={{ minHeight: "56px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {!botUsername && (
-              <span style={{ fontFamily: MONO, fontSize: "10px", color: C.muted }}>Loading widget…</span>
-            )}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

@@ -27,7 +27,6 @@ function verifyState(state: string): string {
 
 function fail(msg: string) {
   const url = new URL(`${APP_URL}/dapp`);
-  url.searchParams.set("tab",           "initiation");
   url.searchParams.set("verify_error",  msg);
   return NextResponse.redirect(url.toString());
 }
@@ -89,7 +88,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!isMember) {
-    const inviteUrl = `${APP_URL}/dapp?tab=initiation&verify_error=not_member`;
+    const inviteUrl = `${APP_URL}/dapp?verify_error=not_member`;
     return NextResponse.redirect(inviteUrl);
   }
 
@@ -144,7 +143,6 @@ export async function GET(req: NextRequest) {
 
   // ── 5. Redirect back with success ────────────────────────────────────────
   const success = new URL(`${APP_URL}/dapp`);
-  success.searchParams.set("tab",      "initiation");
   success.searchParams.set("verified", "discord");
   return NextResponse.redirect(success.toString());
 }

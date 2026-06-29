@@ -9,8 +9,10 @@ import ActivityFeed from "@/components/ActivityFeed";
 import DropHunt from "@/components/DropHunt";
 import MemeArena from "@/components/MemeArena";
 import DailyStreak from "@/components/DailyStreak";
+import StarterDashboard from "@/components/StarterDashboard";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
+import { useCelebration } from "@/context/CelebrationContext";
 import { useWallet } from "@/hooks/useWallet";
 import { useWalletBinding } from "@/hooks/useWalletBinding";
 import { autoCompleteMissions, getLeaderboard, calcProgress, getUserMissions } from "@/lib/missions";
@@ -50,14 +52,29 @@ const TIER_BG      = ["rgba(92,92,92,0.08)", "rgba(167,139,250,0.08)", "rgba(201
 const TIER_DAYS    = [0, 30, 90];
 const TIER_REWARDS = ["1.0×", "1.5×", "2.0×"];
 
-type Tab = "dashboard" | "daily" | "initiation" | "missions" | "onchain" | "leaderboard" | "drops" | "memes";
+type Tab = "home" | "dashboard" | "initiation" | "missions" | "onchain" | "leaderboard" | "drops" | "memes";
 
 export default function DAppPage() {
   const { user, profile, openAuthModal } = useAuth();
   const toast  = useToast();
+  const { celebrate } = useCelebration();
   const wallet = useWallet();
   const binding = useWalletBinding();
-  const [tab, setTab] = useState<Tab>("dashboard");
+  const [tab, setTab] = useState<Tab>("home");
+
+  // Phase 2 gate — advanced features (Overview/Initiation/Missions/Memes/Drops/
+  // On-Chain/Leaderboard) stay hidden behind the simplified Home until the user
+  // unlocks them (auto when the 5 starter tasks are done, or by choosing to
+  // explore). Persisted so returning users keep their unlocked view.
+  const [phase2, setPhase2] = useState(false);
+  useEffect(() => {
+    try { if (localStorage.getItem("otter_phase2") === "1") setPhase2(true); } catch {}
+  }, []);
+  const handleUnlock = useCallback(() => {
+    setPhase2(true);
+    try { localStorage.setItem("otter_phase2", "1"); } catch {}
+    setTab("dashboard");
+  }, []);
 
   // Destructure stable primitives to avoid infinite loop in fetchChain
   const walletAddr       = wallet.address;  // live connected address (read-only views)
@@ -108,9 +125,12 @@ export default function DAppPage() {
   const [progress,   setProgress]   = useState({ done: 0, total: 0, pts: 0, pct: 0 });
   // Initiation signal weight (separate system)
   const [initSignal, setInitSignal] = useState(0);
+  // Authoritative stored points balance (includes welcome bonus, daily spin,
+  // starter tasks, admin adjustments — not just mission points)
+  const [storedPoints, setStoredPoints] = useState<number | null>(null);
 
   // Total-points "bump" animation when the total increases (mission/spin reward)
-  const totalPoints = (progress.pts + initSignal);
+  const totalPoints = ((storedPoints ?? progress.pts) + initSignal);
   const [bumpTotal, setBumpTotal] = useState(false);
   const prevTotalRef = useRef(0);
   useEffect(() => {
@@ -172,15 +192,41 @@ export default function DAppPage() {
   // Load initiation signal weight — also called as callback when tasks complete
   const refreshPoints = useCallback(async () => {
     if (!user) return;
-    const [missions, initiation] = await Promise.all([
+    const [missions, initiation, userSnap] = await Promise.all([
       getUserMissions(user.uid),
       getUserInitiation(user.uid),
+      getDoc(doc(db, "users", user.uid)),
     ]);
     setProgress(calcProgress(missions));
     setInitSignal(calcInitiationProgress(initiation).signal);
+    if (userSnap.exists()) setStoredPoints((userSnap.data().points as number) ?? 0);
   }, [user]);
 
   useEffect(() => { refreshPoints(); }, [refreshPoints, tab]);
+
+  // Handle the Discord OAuth return (?verified=discord / ?verify_error=…). The
+  // callback redirects here after a full page load, so this runs once on mount.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const cleanUrl = (key: string) => {
+      const u = new URL(window.location.href);
+      u.searchParams.delete(key);
+      window.history.replaceState({}, "", u.toString());
+    };
+    if (params.get("verified") === "discord") {
+      toast("Discord membership verified ✓", "success");
+      celebrate(1.4);
+      refreshPoints();
+      cleanUrl("verified");
+    }
+    const verr = params.get("verify_error");
+    if (verr) {
+      toast(verr === "not_member" ? "You're not in the Discord server — join first" : verr, "error");
+      cleanUrl("verify_error");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
 
   // ── SEND OTTER ───────────────────────────────────────────────────────────
@@ -251,15 +297,19 @@ export default function DAppPage() {
   const tierPct    = nextTier && holdDays !== null ? Math.min(100, Math.round((holdDays / nextTier) * 100)) : 100;
 
   // ── NAV TABS ─────────────────────────────────────────────────────────────
-  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: "dashboard",   label: "Dashboard",   icon: <Activity size={14} /> },
-    { id: "daily",       label: "◈ Daily Spin", icon: <span style={{ fontSize: "13px" }}>🔥</span> },
+  // Home is always present; the advanced tabs appear only after Phase 2 unlock.
+  const ADVANCED_TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: "dashboard",   label: "Overview",    icon: <Activity size={14} /> },
     { id: "initiation",  label: "◈ Initiation", icon: <Zap size={14} /> },
     { id: "missions",    label: "Missions",    icon: <BarChart2 size={14} /> },
     { id: "memes",       label: "Meme Arena",  icon: <span style={{ fontSize: "13px" }}>🔥</span> },
     { id: "drops",       label: "Drop Hunts",  icon: <span style={{ fontSize: "13px" }}>🎯</span> },
     { id: "onchain",     label: "On-Chain",    icon: <Shield size={14} /> },
     { id: "leaderboard", label: "Leaderboard", icon: <Trophy size={14} /> },
+  ];
+  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: "home", label: "Home", icon: <span style={{ fontSize: "13px" }}>🦦</span> },
+    ...(phase2 ? ADVANCED_TABS : []),
   ];
 
   return (
@@ -350,52 +400,21 @@ export default function DAppPage() {
               </div>
             )}
 
-            {/* ════ DASHBOARD ════ */}
+            {/* ════ HOME — simplified onboarding ════ */}
+            {tab === "home" && (
+              <div style={{ animation: "tab-slide 0.3s ease both" }}>
+                <StarterDashboard
+                  uid={user?.uid}
+                  onPointsChange={refreshPoints}
+                  onUnlockPhase2={handleUnlock}
+                  openAuthModal={openAuthModal}
+                />
+              </div>
+            )}
+
+            {/* ════ OVERVIEW (advanced) ════ */}
             {tab === "dashboard" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-
-                {/* ★ SPECIAL FEATURE — Daily Streak & Spin highlight */}
-                <button onClick={() => setTab("daily")} className="feature-banner btn-press"
-                  style={{
-                    textAlign: "left", cursor: "pointer", width: "100%",
-                    background: "linear-gradient(120deg, #1A1306 0%, #0D0A04 55%, #0A0800 100%)",
-                    border: "1px solid rgba(201,168,76,0.35)", borderRadius: "14px",
-                    padding: "18px 20px", display: "flex", alignItems: "center",
-                    justifyContent: "space-between", gap: "14px", flexWrap: "wrap",
-                    boxShadow: "0 0 28px rgba(201,168,76,0.08)",
-                  }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                    <div className="streak-flame-live" style={{
-                      width: "46px", height: "46px", borderRadius: "12px", flexShrink: 0,
-                      background: "radial-gradient(circle at 35% 30%, #F4DC8A, #C9A84C 55%, #8B6000)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      boxShadow: "0 0 18px rgba(201,168,76,0.45)",
-                    }}>
-                      <span style={{ fontSize: "22px" }}>🔥</span>
-                    </div>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                        <span style={{ fontFamily: "var(--font-cinzel, serif)", fontWeight: 900, fontSize: "15px", color: C.text, letterSpacing: "0.04em" }}>
-                          Daily Streak & Spin
-                        </span>
-                        <span style={{ background: "rgba(255,69,69,0.12)", color: "#FF6B6B", border: "1px solid rgba(255,69,69,0.3)", borderRadius: "20px", padding: "1px 9px", fontSize: "9px", fontWeight: 800, fontFamily: "var(--font-cinzel, serif)", letterSpacing: "0.1em" }}>
-                          NEW
-                        </span>
-                      </div>
-                      <div style={{ fontFamily: "var(--font-geist-mono)", color: C.mutedH, fontSize: "11px", letterSpacing: "0.04em", marginTop: "4px" }}>
-                        Check in every day · spin the wheel · win up to 500 points
-                      </div>
-                    </div>
-                  </div>
-                  <span style={{
-                    display: "flex", alignItems: "center", gap: "6px",
-                    background: "linear-gradient(135deg,#C9A84C,#E2BF6E)", color: "#000",
-                    borderRadius: "9px", padding: "9px 16px", fontSize: "12px", fontWeight: 800,
-                    fontFamily: "var(--font-cinzel, serif)", letterSpacing: "0.06em", whiteSpace: "nowrap",
-                  }}>
-                    Claim today <ArrowRight size={14} />
-                  </span>
-                </button>
 
                 {/* Season 1 banner */}
                 <div className="season-pulse" style={{
@@ -624,23 +643,6 @@ export default function DAppPage() {
                   <div style={{ background: "rgba(201,168,76,0.04)", border: `1px solid rgba(201,168,76,0.12)`, borderRadius: "12px", padding: "20px", textAlign: "center" }}>
                     <div style={{ fontWeight: 700, marginBottom: "6px" }}>Join the Raft</div>
                     <div style={{ color: C.muted, fontSize: "13px", marginBottom: "14px" }}>Sign in to track missions, earn points, and claim your Rafter position.</div>
-                    <button onClick={openAuthModal}
-                      style={{ background: "linear-gradient(135deg,#C9A84C,#E2BF6E)", color: "#000", border: "none", borderRadius: "10px", padding: "10px 24px", fontWeight: 700, fontSize: "13px", cursor: "pointer" }}>
-                      Sign In / Register
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ════ DAILY STREAK & SPIN ════ */}
-            {tab === "daily" && (
-              <div style={{ animation: "tab-slide 0.3s ease both", display: "flex", flexDirection: "column", gap: "16px" }}>
-                <DailyStreak uid={user?.uid} onReward={refreshPoints} />
-                {!user && (
-                  <div style={{ background: "rgba(201,168,76,0.04)", border: `1px solid rgba(201,168,76,0.12)`, borderRadius: "12px", padding: "20px", textAlign: "center" }}>
-                    <div style={{ fontWeight: 700, marginBottom: "6px" }}>Sign in to start your streak</div>
-                    <div style={{ color: C.muted, fontSize: "13px", marginBottom: "14px" }}>Daily check-ins build a streak and unlock a spin every day. Don&apos;t break the chain.</div>
                     <button onClick={openAuthModal}
                       style={{ background: "linear-gradient(135deg,#C9A84C,#E2BF6E)", color: "#000", border: "none", borderRadius: "10px", padding: "10px 24px", fontWeight: 700, fontSize: "13px", cursor: "pointer" }}>
                       Sign In / Register
@@ -925,8 +927,8 @@ export default function DAppPage() {
             {/* Wallet */}
             <WalletConnect />
 
-            {/* Daily streak quick widget */}
-            {user && tab !== "daily" && (
+            {/* Daily streak quick widget — hidden on Home (full widget already shown there) */}
+            {user && tab !== "home" && (
               <DailyStreak uid={user.uid} onReward={refreshPoints} compact />
             )}
 
@@ -956,7 +958,7 @@ export default function DAppPage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                   {[
                     { label: "Missions",    value: `${progress.done}/${progress.total}`, color: C.gold },
-                    { label: "Points",      value: progress.pts.toLocaleString(),        color: C.gold },
+                    { label: "Points",      value: (storedPoints ?? progress.pts).toLocaleString(), color: C.gold },
                     { label: "Referrals",   value: String(profile?.referralCount ?? 0),  color: C.green },
                     { label: "Tier",        value: profile?.tier ?? "NEWCOMER",          color: C.purple },
                   ].map((s) => (

@@ -518,3 +518,99 @@ input:focus, textarea:focus, select:focus {
   }
   .spin-wheel { transition: transform 0.6s ease !important; }
 }
+
+/* ─── CELEBRATION CONFETTI ────────────────────────────────────────────────── */
+@keyframes confetti-fall {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  10%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translate(var(--cf-dx, 0), 108vh) rotate(var(--cf-rot, 360deg)); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes confetti-fall { from { opacity: 0; } to { opacity: 0; } }
+}
+
+/* ─── dAPP BETA CTA — rotating animated ring ──────────────────────────────── */
+@keyframes cta-ring-rotate { to { transform: rotate(1turn); } }
+@keyframes cta-glow-pulse {
+  0%,100% { box-shadow: 0 0 16px rgba(201,168,76,0.25); }
+  50%     { box-shadow: 0 0 34px rgba(201,168,76,0.6); }
+}
+@keyframes cta-coin-spin { to { transform: rotateY(360deg); } }
+
+.dapp-cta {
+  position: relative; display: inline-flex; padding: 2px; border-radius: 9px;
+  overflow: hidden; text-decoration: none; isolation: isolate;
+  animation: cta-glow-pulse 2.4s ease-in-out infinite;
+}
+/* Running "lights" chasing around the border — sharp bright points on a dark
+   ring that rotate, reading as lights travelling around the edge. */
+.dapp-cta::before {
+  content: ""; position: absolute; z-index: 0; inset: -65%;
+  background: conic-gradient(from 0deg,
+    transparent 0deg, transparent 40deg,
+    rgba(244,220,138,0.0) 52deg, #F4DC8A 60deg, #FFFFFF 63deg, #F4DC8A 66deg, rgba(244,220,138,0.0) 74deg,
+    transparent 110deg, transparent 130deg,
+    rgba(244,220,138,0.0) 142deg, #F4DC8A 150deg, #FFFFFF 153deg, #F4DC8A 156deg, rgba(244,220,138,0.0) 164deg,
+    transparent 200deg, transparent 220deg,
+    rgba(244,220,138,0.0) 232deg, #F4DC8A 240deg, #FFFFFF 243deg, #F4DC8A 246deg, rgba(244,220,138,0.0) 254deg,
+    transparent 290deg, transparent 310deg,
+    rgba(244,220,138,0.0) 322deg, #F4DC8A 330deg, #FFFFFF 333deg, #F4DC8A 336deg, rgba(244,220,138,0.0) 344deg,
+    transparent 360deg);
+  animation: cta-ring-rotate 3.2s linear infinite;
+}
+/* dim base ring so the dark edge is always visible behind the moving lights */
+.dapp-cta::after {
+  content: ""; position: absolute; z-index: 0; inset: 0; border-radius: inherit;
+  border: 1px solid rgba(201,168,76,0.25); pointer-events: none;
+}
+.dapp-cta-inner {
+  position: relative; z-index: 1;
+  display: inline-flex; align-items: center; gap: 9px;
+  background: linear-gradient(135deg, #19130A 0%, #0B0805 100%);
+  color: #F4DC8A; border-radius: 7px; padding: 14px 28px;
+  font-weight: 800; letter-spacing: 0.06em; white-space: nowrap;
+  transition: background 0.2s;
+}
+.dapp-cta:hover .dapp-cta-inner { background: linear-gradient(135deg, #241B0C, #0E0A05); }
+
+/* Gold-filled variant (primary "Claim" button) */
+.dapp-cta-inner.is-gold {
+  background: linear-gradient(135deg, #C9A84C, #F4DC8A);
+  color: #1A1206;
+}
+.dapp-cta:hover .dapp-cta-inner.is-gold { background: linear-gradient(135deg, #D8B95C, #FFE89A); }
+
+/* Green variant (Claim button) — green fill, green running lights, green glow */
+@keyframes cta-glow-green {
+  0%,100% { box-shadow: 0 0 16px rgba(0,200,150,0.30); }
+  50%     { box-shadow: 0 0 36px rgba(0,200,150,0.65); }
+}
+.dapp-cta-green { animation: cta-glow-green 2.4s ease-in-out infinite; }
+.dapp-cta-green::before {
+  background: conic-gradient(from 0deg,
+    transparent 0deg, transparent 40deg,
+    rgba(52,224,176,0) 52deg, #34E0B0 60deg, #FFFFFF 63deg, #34E0B0 66deg, rgba(52,224,176,0) 74deg,
+    transparent 110deg, transparent 130deg,
+    rgba(52,224,176,0) 142deg, #34E0B0 150deg, #FFFFFF 153deg, #34E0B0 156deg, rgba(52,224,176,0) 164deg,
+    transparent 200deg, transparent 220deg,
+    rgba(52,224,176,0) 232deg, #34E0B0 240deg, #FFFFFF 243deg, #34E0B0 246deg, rgba(52,224,176,0) 254deg,
+    transparent 290deg, transparent 310deg,
+    rgba(52,224,176,0) 322deg, #34E0B0 330deg, #FFFFFF 333deg, #34E0B0 336deg, rgba(52,224,176,0) 344deg,
+    transparent 360deg);
+}
+.dapp-cta-green::after { border-color: rgba(0,200,150,0.30); }
+.dapp-cta-inner.is-green {
+  background: linear-gradient(135deg, #00C896, #34E0B0);
+  color: #002018;
+}
+.dapp-cta-green:hover .dapp-cta-inner.is-green { background: linear-gradient(135deg, #16D6A4, #5FE9C0); }
+.dapp-cta-coin { display: inline-flex; animation: cta-coin-spin 3.5s linear infinite; }
+.dapp-cta-badge {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.14em;
+  background: rgba(0,200,150,0.12); color: #00C896;
+  border: 1px solid rgba(0,200,150,0.35); border-radius: 20px; padding: 2px 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dapp-cta, .dapp-cta::before, .dapp-cta-coin { animation: none !important; }
+}

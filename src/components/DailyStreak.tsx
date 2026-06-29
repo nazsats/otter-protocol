@@ -4,6 +4,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { authFetch } from "@/lib/api";
 import { useToast } from "@/context/ToastContext";
+import { useCelebration } from "@/context/CelebrationContext";
 import {
   PRIZES, EMPTY_DAILY, utcDateString, streakMultiplier, DailyState,
 } from "@/lib/daily";
@@ -35,6 +36,7 @@ export default function DailyStreak({ uid, onReward, compact }: {
   compact?: boolean;
 }) {
   const toast = useToast();
+  const { celebrate } = useCelebration();
   const [state,    setState]    = useState<DailyState>(EMPTY_DAILY);
   const [loading,  setLoading]  = useState(true);
   const [busy,     setBusy]     = useState(false);
@@ -98,7 +100,7 @@ export default function DailyStreak({ uid, onReward, compact }: {
           ? ` · +${data.milestoneBonus} day-${data.milestoneDay} bonus!`
           : "";
         toast(`Day ${data.streak} streak sealed${milestone}`, "success");
-        if (data.milestoneBonus > 0) showFloat(`+${data.milestoneBonus} pts`);
+        if (data.milestoneBonus > 0) { showFloat(`+${data.milestoneBonus} pts`); celebrate(1.5); }
         onReward?.();
       }
     } catch (e: unknown) {
@@ -136,6 +138,7 @@ export default function DailyStreak({ uid, onReward, compact }: {
           data.jackpot ? `JACKPOT! +${data.awarded} points 🎉` : `+${data.awarded} points won!`,
           "success"
         );
+        celebrate(data.jackpot ? 2 : 1);
         onReward?.();
         setBusy(false);
       }, 4300);

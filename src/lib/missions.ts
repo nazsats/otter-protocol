@@ -254,7 +254,7 @@ export async function getActivityFeed(limit = 20) {
 
 export interface ActivityEntry {
   id:          string;
-  type:        "join" | "mission" | "claim" | "referral" | "transfer" | "initiation" | "admin_points";
+  type:        "join" | "mission" | "claim" | "referral" | "transfer" | "initiation" | "admin_points" | "welcome";
   displayName: string;
   mission?:    string;
   badge?:      string;
