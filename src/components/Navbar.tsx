@@ -259,20 +259,40 @@ export default function Navbar() {
         }}
           className="nav-mobile">
           <div style={{ padding: "24px", flex: 1, overflowY: "auto" }}>
-            {NAV_LINKS.map((item) => (
+            {NAV_LINKS.filter((item) => !item.highlight).map((item) => (
               <Link key={item.label} href={item.href}
                 onClick={() => setMobileOpen(false)}
                 style={{
                   fontFamily: "var(--font-cinzel, serif)",
                   display: "block", padding: "16px 0",
-                  color: item.green ? "#00C896" : item.highlight ? C.gold : C.text,
+                  color: C.text,
                   textDecoration: "none", fontSize: "16px", fontWeight: 700,
                   borderBottom: `1px solid ${C.border}`, letterSpacing: "0.1em",
                   textTransform: "uppercase",
                 }}>
-                {item.green ? "◈ " : ""}{item.label}
+                {item.label}
               </Link>
             ))}
+
+            {/* Highlighted CTAs — full-width animated buttons in the drawer */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "24px" }}>
+              {NAV_LINKS.filter((item) => item.highlight).map((item) => (
+                <Link key={item.label} href={item.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={`dapp-cta${item.green ? " dapp-cta-green" : ""}`}
+                  aria-label={item.green ? "Claim OTTER in the dApp" : "Open the OTTER dApp Beta"}
+                  style={{ display: "flex", width: "100%", fontFamily: "var(--font-cinzel, serif)" }}>
+                  <span className={`dapp-cta-inner${item.green ? " is-green" : ""}`} style={{
+                    width: "100%", justifyContent: "center",
+                    fontSize: "15px", fontWeight: 800, letterSpacing: "0.08em",
+                    textTransform: "uppercase", padding: "16px 20px", borderRadius: "11px", gap: "10px",
+                  }}>
+                    <span className="dapp-cta-coin" style={{ fontSize: "15px", color: item.green ? "#002018" : undefined }}>◈</span>
+                    {item.label}
+                  </span>
+                </Link>
+              ))}
+            </div>
 
             <div style={{ marginTop: "32px", display: "flex", flexDirection: "column", gap: "12px" }}>
               {!user ? (

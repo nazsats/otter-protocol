@@ -488,23 +488,6 @@ export default function AboutPage() {
 
             {/* CTAs */}
             <div className="hero-cta" style={{ display: "flex", gap: "14px", justifyContent: "center", flexWrap: "wrap", marginBottom: "72px" }}>
-              {/* 1 — dApp Beta (dark, animated light border) → /dapp */}
-              <Link href="/dapp" className="dapp-cta" aria-label="Open the OTTER dApp Beta" style={{ fontFamily: FONT, fontSize: "14px" }}>
-                <span className="dapp-cta-inner">
-                  <span className="dapp-cta-coin" style={{ fontFamily: MONO, fontSize: "16px", color: "#F4DC8A" }}>◈</span>
-                  dApp Beta
-                  <ArrowRight size={15} />
-                </span>
-              </Link>
-
-              {/* 2 — Claim +1,000 OTTER (green, animated light border) → /dapp */}
-              <Link href="/dapp" className="dapp-cta dapp-cta-green" aria-label="Claim 1000 OTTER in the dApp" style={{ fontFamily: FONT, fontSize: "14px" }}>
-                <span className="dapp-cta-inner is-green">
-                  <span className="dapp-cta-coin" style={{ fontFamily: MONO, fontSize: "16px", color: "#002018" }}>◈</span>
-                  Claim +1,000 OTTER
-                  <ArrowRight size={15} />
-                </span>
-              </Link>
               <button onClick={openAuthModal} style={{
                 display: "inline-flex", alignItems: "center", gap: "8px",
                 background: "transparent", border: `1px solid rgba(201,168,76,0.25)`,
