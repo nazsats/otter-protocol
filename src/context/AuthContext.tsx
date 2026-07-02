@@ -16,7 +16,7 @@ import {
   User,
 } from "firebase/auth";
 import { auth, googleProvider, twitterProvider } from "@/lib/firebase";
-import { createUserProfile, getUserProfile, linkWallet } from "@/lib/referral";
+import { createUserProfile, getUserProfile, linkWallet, ensureReferralCode } from "@/lib/referral";
 
 interface UserProfile {
   uid: string;
@@ -64,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = async () => {
     if (!user) return;
+    await ensureReferralCode(user.uid); // backfill code for legacy accounts
     const p = await getUserProfile(user.uid);
     if (p) setProfile(p as UserProfile);
   };
@@ -74,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (u) {
         // Store uid so the wallet hook can link wallet → Firebase without auth dependency
         localStorage.setItem("otter_uid", u.uid);
+        await ensureReferralCode(u.uid); // backfill code for legacy accounts
         const p = await getUserProfile(u.uid);
         setProfile(p as UserProfile | null);
       } else {

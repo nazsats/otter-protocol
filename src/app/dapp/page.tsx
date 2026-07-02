@@ -15,7 +15,7 @@ import { useToast } from "@/context/ToastContext";
 import { useCelebration } from "@/context/CelebrationContext";
 import { useWallet } from "@/hooks/useWallet";
 import { useWalletBinding } from "@/hooks/useWalletBinding";
-import { autoCompleteMissions, getLeaderboard, calcProgress, getUserMissions } from "@/lib/missions";
+import { autoCompleteMissions, getLeaderboard, getUserRank, calcProgress, getUserMissions } from "@/lib/missions";
 import { getUserInitiation, calcInitiationProgress } from "@/lib/initiation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -119,7 +119,9 @@ export default function DAppPage() {
   const [lastTx,     setLastTx]     = useState<string | null>(null);
 
   // Leaderboard
-  const [leaders,    setLeaders]    = useState<{ rank: number; name: string; points: number; referrals: number; tier: string }[]>([]);
+  const [leaders,    setLeaders]    = useState<{ rank: number; uid: string; name: string; points: number; referrals: number; tier: string }[]>([]);
+  // True global rank by points (matched by uid — correct even outside top 10)
+  const [myRank,     setMyRank]     = useState<{ rank: number | null; total: number }>({ rank: null, total: 0 });
 
   // Missions summary
   const [progress,   setProgress]   = useState({ done: 0, total: 0, pts: 0, pct: 0 });
@@ -188,6 +190,12 @@ export default function DAppPage() {
   useEffect(() => {
     getLeaderboard().then(setLeaders).catch(() => {});
   }, []);
+
+  // Load the user's true global rank — recomputed when their points change.
+  useEffect(() => {
+    if (!user) { setMyRank({ rank: null, total: 0 }); return; }
+    getUserRank(user.uid).then(setMyRank).catch(() => {});
+  }, [user, storedPoints]);
 
   // Load initiation signal weight — also called as callback when tasks complete
   const refreshPoints = useCallback(async () => {
@@ -866,7 +874,7 @@ export default function DAppPage() {
                       </div>
                     )}
                     {leaders.map((r, i) => {
-                      const isMe = profile?.displayName === r.name;
+                      const isMe = r.uid === user?.uid;
                       const rankColors = ["#FFD700", "#C0C0C0", "#CD7F32"];
                       return (
                         <div key={i} style={{ display: "grid", gridTemplateColumns: "40px 1fr 80px 70px 80px", gap: "8px", padding: "12px", borderRadius: "8px", background: isMe ? "rgba(201,168,76,0.04)" : "transparent", borderBottom: i < leaders.length - 1 ? `1px solid ${C.border}` : "none", alignItems: "center" }}>
@@ -885,12 +893,12 @@ export default function DAppPage() {
                   </div>
 
                   {/* Your position if not in top 10 */}
-                  {user && !leaders.some((r) => r.name === profile?.displayName) && (
+                  {user && !leaders.some((r) => r.uid === user?.uid) && (
                     <div style={{ borderTop: `1px solid ${C.border}`, marginTop: "8px", paddingTop: "12px", padding: "12px", background: "rgba(201,168,76,0.03)", borderRadius: "0 0 10px 10px" }}>
                       <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 80px 70px 80px", gap: "8px", alignItems: "center" }}>
-                        <div style={{ color: C.muted, fontSize: "13px" }}>—</div>
+                        <div style={{ color: C.muted, fontSize: "13px" }}>{myRank.rank ? `#${myRank.rank}` : "—"}</div>
                         <div style={{ fontWeight: 700, fontSize: "13px", color: C.gold }}>{profile?.displayName ?? "You"} <span style={{ fontSize: "10px" }}>(you)</span></div>
-                        <div style={{ fontWeight: 700, fontSize: "13px", color: C.gold }}>{progress.pts.toLocaleString()}</div>
+                        <div style={{ fontWeight: 700, fontSize: "13px", color: C.gold }}>{(storedPoints ?? progress.pts).toLocaleString()}</div>
                         <div style={{ color: C.muted, fontSize: "13px" }}>{profile?.referralCount ?? 0}</div>
                         <div style={{ fontSize: "11px", fontWeight: 700, color: C.muted }}>{profile?.tier ?? "NEWCOMER"}</div>
                       </div>
@@ -941,9 +949,11 @@ export default function DAppPage() {
                   letterSpacing: "0.18em", marginBottom: "6px",
                 }}>◈ YOUR POSITION</div>
                 <div style={{ fontSize: "32px", fontWeight: 900, background: `linear-gradient(135deg,${C.gold},${C.goldL})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", lineHeight: 1 }}>
-                  Rafter #{String(leaders.findIndex((r) => r.name === profile?.displayName) + 1 || "?").padStart(3, "0")}
+                  Rafter #{myRank.rank ? String(myRank.rank).padStart(3, "0") : "—"}
                 </div>
-                <div style={{ color: C.muted, fontSize: "12px", marginTop: "4px" }}>{leaders.length} total rafters</div>
+                <div style={{ color: C.muted, fontSize: "12px", marginTop: "4px" }}>
+                  {myRank.rank ? `of ${myRank.total} rafters` : "earn points to get ranked"}
+                </div>
               </div>
             )}
 
@@ -973,7 +983,7 @@ export default function DAppPage() {
 
             {/* X share */}
             {user && (
-              <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`I'm Rafter #${leaders.findIndex((r) => r.name === profile?.displayName) + 1 || "?"} on OTTER Protocol 🦦\n\nHold Together. Build Together.\n\nJoin the Raft 👇`)}&url=${encodeURIComponent((process.env.NEXT_PUBLIC_APP_URL || "https://otterprotocol.xyz") + "/?ref=" + (profile?.referralCode || ""))}`}
+              <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`I'm Rafter #${myRank.rank ?? "?"} on @otter_protocol1 🦦\n\nHold Together. Build Together.\n\nJoin the Raft 👇`)}&url=${encodeURIComponent((process.env.NEXT_PUBLIC_APP_URL || "https://otterprotocol.xyz") + "/?ref=" + (profile?.referralCode || ""))}`}
                 target="_blank" rel="noopener noreferrer"
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", background: "#080808", border: `1px solid ${C.border}`, color: C.text, borderRadius: "12px", padding: "14px", textDecoration: "none", fontWeight: 700, fontSize: "13px" }}
                 onMouseEnter={(e) => (e.currentTarget.style.borderColor = C.gold)}

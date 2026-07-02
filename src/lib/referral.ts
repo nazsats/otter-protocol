@@ -12,11 +12,12 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-// Generate a cryptographically random 8-char referral code
+// Generate a cryptographically random 6-char alphanumeric referral code
 // NOT derived from uid — unpredictable and collision-resistant
 export function generateReferralCode(_uid: string): string {
+  const CODE_LEN = 6;
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 32 chars, no ambiguous O/0/I/1
-  const bytes = new Uint8Array(8);
+  const bytes = new Uint8Array(CODE_LEN);
   // Works in both Node.js (crypto module) and browser (Web Crypto)
   if (typeof globalThis.crypto !== "undefined" && globalThis.crypto.getRandomValues) {
     globalThis.crypto.getRandomValues(bytes);
@@ -24,8 +25,8 @@ export function generateReferralCode(_uid: string): string {
     // Node.js fallback
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { randomBytes } = require("crypto") as { randomBytes: (n: number) => Buffer };
-    const buf = randomBytes(8);
-    for (let i = 0; i < 8; i++) bytes[i] = buf[i];
+    const buf = randomBytes(CODE_LEN);
+    for (let i = 0; i < CODE_LEN; i++) bytes[i] = buf[i];
   }
   return Array.from(bytes).map((b) => chars[b % chars.length]).join("");
 }
@@ -101,6 +102,20 @@ async function applyReferral(referralCode: string, newUid: string) {
     }),
     updateDoc(referrerDoc.ref, { referralCount: increment(1) }),
   ]);
+}
+
+// Backfill a referral code for existing users who were created before the
+// referralCode field existed (or otherwise lack one). Returns the code.
+export async function ensureReferralCode(uid: string): Promise<string | null> {
+  const ref  = doc(db, "users", uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return null;
+  const existing = snap.data().referralCode as string | undefined;
+  if (existing) return existing;
+
+  const referralCode = generateReferralCode(uid);
+  await updateDoc(ref, { referralCode });
+  return referralCode;
 }
 
 // Link wallet address to user profile

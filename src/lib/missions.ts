@@ -226,17 +226,41 @@ export async function autoCompleteMissions(uid: string, context: {
 export async function getLeaderboard() {
   const snap = await getDocs(collection(db, "users"));
   return snap.docs
-    .map((d) => d.data())
-    .filter((u) => (u.points || 0) > 0)
-    .sort((a, b) => (b.points || 0) - (a.points || 0))
+    .map((d) => {
+      const u = d.data();
+      return {
+        uid:           d.id,
+        displayName:   u.displayName as string | undefined,
+        points:        (u.points as number)        || 0,
+        referralCount: (u.referralCount as number) || 0,
+        tier:          u.tier as string | undefined,
+      };
+    })
+    .filter((u) => u.points > 0)
+    .sort((a, b) => b.points - a.points)
     .slice(0, 10)
     .map((u, i) => ({
       rank:      i + 1,
-      name:      u.displayName || "Anonymous",
-      points:    u.points       || 0,
-      referrals: u.referralCount || 0,
+      uid:       u.uid,
+      name:      u.displayName   || "Anonymous",
+      points:    u.points,
+      referrals: u.referralCount,
       tier:      u.tier          || "NEWCOMER",
     }));
+}
+
+/**
+ * A user's true global rank by points (1-based), even when outside the top 10.
+ * Matches by uid — not display name — so it's correct for everyone.
+ */
+export async function getUserRank(uid: string): Promise<{ rank: number | null; total: number }> {
+  const snap = await getDocs(collection(db, "users"));
+  const ranked = snap.docs
+    .map((d) => ({ uid: d.id, points: (d.data().points as number) || 0 }))
+    .filter((u) => u.points > 0)
+    .sort((a, b) => b.points - a.points);
+  const idx = ranked.findIndex((u) => u.uid === uid);
+  return { rank: idx >= 0 ? idx + 1 : null, total: ranked.length };
 }
 
 // Get recent activity feed

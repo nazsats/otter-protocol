@@ -45,7 +45,8 @@ export default function Navbar() {
 
   const copyReferral = () => {
     if (!profile?.referralCode) return;
-    const url = `${window.location.origin}?ref=${profile.referralCode}`;
+    const base = process.env.NEXT_PUBLIC_APP_URL || "https://otterprotocol.xyz";
+    const url = `${base}/?ref=${profile.referralCode}`;
     navigator.clipboard.writeText(url);
     setCopiedRef(true);
     setTimeout(() => setCopiedRef(false), 2000);

@@ -58,6 +58,12 @@ export const STARTER_TASKS: StarterTask[] = [
     desc:  "Join the Discord server, then verify your membership.",
     link:  "https://discord.gg/EGzu4NHqP", points: 100,
   },
+  {
+    id: "starter_share_referral", action: "link", icon: "🔗",
+    label: "Share your referral link",
+    desc:  "Invite friends with your unique link. First share earns points.",
+    points: 150,
+  },
 ];
 
 export interface StarterState {

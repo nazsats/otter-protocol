@@ -471,7 +471,7 @@ function RecruitStage({ active }: { active: boolean }) {
   const [forged, setForged] = useState(false);
 
   const refLink = wallet.address
-    ? `${typeof window !== "undefined" ? window.location.origin : "https://otterfi.vercel.app"}/?ref=${wallet.address}`
+    ? `${process.env.NEXT_PUBLIC_APP_URL || "https://otterprotocol.xyz"}/?ref=${wallet.address}`
     : null;
 
   const forge = () => setForged(true);

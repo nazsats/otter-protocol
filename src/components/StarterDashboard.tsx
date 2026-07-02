@@ -3,10 +3,11 @@ import { useState, useEffect, useCallback } from "react";
 import { authFetch } from "@/lib/api";
 import { useToast } from "@/context/ToastContext";
 import { useCelebration } from "@/context/CelebrationContext";
+import { useAuth } from "@/context/AuthContext";
 import DailyStreak from "@/components/DailyStreak";
 import TelegramVerifyModal from "@/components/TelegramVerifyModal";
 import { STARTER_TASKS, getStarterState, completeStarterTask, StarterState, StarterTask } from "@/lib/starter";
-import { Check, ExternalLink, ShieldCheck, Gift, ArrowRight, Sparkles, Lock } from "lucide-react";
+import { Check, ExternalLink, ShieldCheck, Gift, ArrowRight, Sparkles, Lock, Copy, Users } from "lucide-react";
 
 const C = {
   black: "#000", card: "#0D0B07", card2: "#0A0800", border: "#1E1A10", borderH: "#2A2418",
@@ -24,6 +25,7 @@ export default function StarterDashboard({ uid, onPointsChange, onUnlockPhase2, 
 }) {
   const toast = useToast();
   const { celebrate } = useCelebration();
+  const { profile } = useAuth();
   const [state,       setState]       = useState<StarterState | null>(null);
   const [loading,     setLoading]     = useState(true);
   const [welcomeBusy, setWelcomeBusy] = useState(false);
@@ -80,6 +82,22 @@ export default function StarterDashboard({ uid, onPointsChange, onUnlockPhase2, 
       }
       setTaskBusy(null);
     }, 1500);
+  };
+
+  // ── Share referral link (click-to-complete, first share earns points) ───────
+  const shareReferral = async () => {
+    if (!uid) { openAuthModal?.(); return; }
+    if (state?.done["starter_share_referral"]) return;
+    try {
+      await completeStarterTask(uid, "starter_share_referral");
+      const t = STARTER_TASKS.find((t) => t.id === "starter_share_referral");
+      toast(`+${t?.points} points — referral link shared!`, "success");
+      celebrate();
+      await load();
+      onPointsChange?.();
+    } catch {
+      // non-blocking — the link was still copied/shared
+    }
   };
 
   // ── Discord verification (OAuth redirect) ───────────────────────────────────
@@ -200,7 +218,7 @@ export default function StarterDashboard({ uid, onPointsChange, onUnlockPhase2, 
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {STARTER_TASKS.map((task) => (
+          {STARTER_TASKS.filter((t) => t.id !== "starter_share_referral").map((task) => (
             <TaskCard
               key={task.id}
               task={task}
@@ -214,6 +232,18 @@ export default function StarterDashboard({ uid, onPointsChange, onUnlockPhase2, 
           ))}
         </div>
       </div>
+
+      {/* Referral — invite via X (counts as a task) */}
+      {profile?.referralCode && (
+        <ReferralCard
+          referralCode={profile.referralCode}
+          referralCount={profile.referralCount ?? 0}
+          handle={profile.displayName}
+          done={!!state?.done["starter_share_referral"]}
+          points={STARTER_TASKS.find((t) => t.id === "starter_share_referral")?.points ?? 0}
+          onShared={shareReferral}
+        />
+      )}
 
       {/* STEP 4 — Phase 2 unlock */}
       <div style={{
@@ -257,6 +287,61 @@ export default function StarterDashboard({ uid, onPointsChange, onUnlockPhase2, 
           {allDone ? "Enter Initiation" : "Explore anyway"} <ArrowRight size={14} />
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── Referral — invite via X ──────────────────────────────────────────────────
+function ReferralCard({ referralCode, referralCount, handle, done, points, onShared }: {
+  referralCode: string; referralCount: number; handle?: string | null;
+  done: boolean; points: number; onShared: () => void;
+}) {
+  const toast = useToast();
+  const APP   = process.env.NEXT_PUBLIC_APP_URL || "https://otterprotocol.xyz";
+  const link  = `${APP}/?ref=${referralCode}`;
+  const text  = "Join me on @otter_protocol1 🦦 — claim your OTTER and build the Raft 👇";
+  const tweet = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`;
+  const xHandle = handle ? (handle.startsWith("@") ? handle : `@${handle}`) : null;
+  const copy  = () => { navigator.clipboard.writeText(link); toast("Referral link copied", "success"); onShared(); };
+
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px 22px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "14px" }}>
+        <div>
+          <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: "15px", color: C.text, letterSpacing: "0.04em", display: "flex", alignItems: "center", gap: "8px" }}>
+            Invite friends on X
+            {done
+              ? <span style={{ fontFamily: MONO, fontSize: "10px", fontWeight: 700, color: C.green, background: "rgba(0,200,150,0.08)", border: "1px solid rgba(0,200,150,0.25)", borderRadius: "20px", padding: "2px 8px" }}>✓ +{points} EARNED</span>
+              : <span style={{ fontFamily: MONO, fontSize: "10px", fontWeight: 700, color: C.gold, background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.25)", borderRadius: "20px", padding: "2px 8px" }}>+{points} PTS</span>}
+          </div>
+          <div style={{ fontFamily: MONO, fontSize: "11px", color: C.muted, marginTop: "3px" }}>
+            {xHandle ? <>Sharing as <span style={{ color: C.gold }}>{xHandle}</span> · </> : null}
+            {done ? "each friend who joins earns you more" : "share once to earn points · friends earn you more"}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "rgba(201,168,76,0.06)", border: `1px solid ${C.border}`, borderRadius: "20px", padding: "4px 12px" }}>
+          <Users size={13} color={C.gold} />
+          <span style={{ fontFamily: MONO, fontWeight: 800, fontSize: "13px", color: C.gold }}>{referralCount}</span>
+          <span style={{ fontFamily: FONT, fontSize: "10px", color: C.mutedL, letterSpacing: "0.06em" }}>joined</span>
+        </div>
+      </div>
+
+      {/* link + copy */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
+        <div style={{ flex: 1, minWidth: 0, background: "#080600", border: `1px solid ${C.border}`, borderRadius: "9px", padding: "11px 12px", fontFamily: MONO, fontSize: "11px", color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {link}
+        </div>
+        <button onClick={copy} className="btn-press"
+          style={{ flexShrink: 0, background: "transparent", border: `1px solid rgba(201,168,76,0.3)`, color: C.gold, borderRadius: "9px", padding: "0 14px", fontWeight: 700, fontSize: "11px", fontFamily: FONT, cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}>
+          <Copy size={13} /> Copy
+        </button>
+      </div>
+
+      {/* primary: share on X */}
+      <a href={tweet} target="_blank" rel="noopener noreferrer" className="btn-press" onClick={onShared}
+        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "9px", background: "linear-gradient(135deg,#0A0A0A,#18181B)", border: `1px solid ${C.borderH}`, color: C.text, borderRadius: "11px", padding: "13px", textDecoration: "none", fontWeight: 800, fontSize: "14px", fontFamily: FONT, letterSpacing: "0.04em" }}>
+        <span style={{ fontWeight: 900, fontSize: "16px" }}>𝕏</span> Share my invite on X
+      </a>
     </div>
   );
 }
